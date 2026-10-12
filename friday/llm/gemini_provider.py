@@ -41,7 +41,7 @@ class GeminiProvider:
             temperature: Creativity control (0.0 to 1.0).
         """
         self.api_key = api_key or os.getenv("GEMINI_API_KEY")
-        self.model_name = model_name or os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+        self.model_name = model_name or os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
         self.system_instruction = system_instruction or DEFAULT_SYSTEM_INSTRUCTION
         self.temperature = temperature
         self._model: Optional[genai.GenerativeModel] = None
