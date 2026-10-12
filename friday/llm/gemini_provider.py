@@ -71,6 +71,12 @@ class GeminiProvider:
         self.api_key = api_key
         self._configure()
 
+    def set_system_instruction(self, instruction: str) -> None:
+        """Update system instructions and refresh model configuration."""
+        self.system_instruction = instruction
+        if self._model is not None:
+            self._configure()
+
     def generate(self, prompt: str) -> str:
         """Generate a one-off completion from Gemini.
 

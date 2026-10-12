@@ -101,6 +101,7 @@ class HybridMemoryEngine:
         query: str,
         top_k: int = 3,
         max_hops: int = 2,
+        min_similarity: float = 0.2,
     ) -> Dict[str, Any]:
         """Perform hybrid retrieval: Vector similarity + 2-hop Graph neighborhood expansion.
 
@@ -108,6 +109,7 @@ class HybridMemoryEngine:
             query: User search query or question.
             top_k: Number of direct vector matches.
             max_hops: Outward graph traversal depth (default 2).
+            min_similarity: Minimum similarity threshold to filter noise.
 
         Returns:
             Dictionary containing:
@@ -116,7 +118,9 @@ class HybridMemoryEngine:
                 - formatted_context: Clean string formatted for LLM prompt injection.
         """
         # Step 1: Semantic Vector Search on CPU
-        vector_hits = self.vector_store.search(query=query, top_k=top_k)
+        vector_hits = self.vector_store.search(
+            query=query, top_k=top_k, min_similarity=min_similarity
+        )
 
         direct_matches: List[Dict[str, Any]] = []
         seed_ids: List[str] = []
