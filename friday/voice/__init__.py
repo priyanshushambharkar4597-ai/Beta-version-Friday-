@@ -1,0 +1,1 @@
+"""Voice subsystem for Friday."""
