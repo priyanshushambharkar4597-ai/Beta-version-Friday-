@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Friday - Jarvis HUD</title>
+  <style>
+    :root {
+      --bg-glass: rgba(10, 16, 28, 0.88);
+      --border-cyan: rgba(0, 240, 255, 0.35);
+      --cyan-glow: #00f0ff;
+      --cyan-dim: rgba(0, 240, 255, 0.15);
+      --amber-warn: #ffb700;
+      --red-alert: #ff3366;
+      --text-main: #e2f1f8;
+      --text-dim: #7e9bb0;
+      --card-bg: rgba(15, 25, 45, 0.6);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      user-select: none;
+    }
+
+    body {
+      background: transparent;
+      color: var(--text-main);
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 12px;
+    }
+
+    .hud-container {
+      width: 100%;
+      height: 100%;
+      background: var(--bg-glass);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--border-cyan);
+      border-radius: 16px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6), 0 0 25px rgba(0, 240, 255, 0.12);
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    /* Top HUD Header */
+    .hud-header {
+      padding: 14px 20px;
+      border-bottom: 1px solid rgba(0, 240, 255, 0.15);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(5, 10, 20, 0.3);
+    }
+
+    .brand-section {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .reactor-core {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      border: 2px solid var(--cyan-glow);
+      box-shadow: 0 0 12px var(--cyan-glow);
+      position: relative;
+      animation: pulse 2.5s infinite ease-in-out;
+    }
+
+    .reactor-core::after {
+      content: '';
+      position: absolute;
+      top: 5px;
+      left: 5px;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--cyan-glow);
+      box-shadow: 0 0 8px #fff;
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); opacity: 0.85; filter: drop-shadow(0 0 4px var(--cyan-glow)); }
+      50% { transform: scale(1.12); opacity: 1; filter: drop-shadow(0 0 12px var(--cyan-glow)); }
+    }
+
+    .title-group h1 {
+      font-size: 16px;
+      letter-spacing: 2.5px;
+      color: #fff;
+      text-transform: uppercase;
+      font-weight: 700;
+    }
+
+    .title-group span {
+      font-size: 11px;
+      color: var(--cyan-glow);
+      letter-spacing: 1px;
+    }
+
+    .hud-telemetry {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .badge {
+      background: var(--card-bg);
+      border: 1px solid rgba(0, 240, 255, 0.2);
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      color: var(--text-dim);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .badge-value {
+      color: var(--cyan-glow);
+      font-weight: 600;
+    }
+
+    .close-btn {
+      background: none;
+      border: none;
+      color: var(--text-dim);
+      font-size: 18px;
+      cursor: pointer;
+      padding: 4px 8px;
+      border-radius: 6px;
+      transition: all 0.2s;
+    }
+
+    .close-btn:hover {
+      color: #fff;
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    /* Waveform Bar */
+    .waveform-bar {
+      height: 36px;
+      background: rgba(0, 240, 255, 0.03);
+      border-bottom: 1px solid rgba(0, 240, 255, 0.08);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 20px;
+    }
+
+    canvas#waveformCanvas {
+      width: 100%;
+      height: 28px;
+    }
+
+    /* Main Log & Activity Feed */
+    .activity-feed {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      scrollbar-width: thin;
+      scrollbar-color: var(--border-cyan) transparent;
+    }
+
+    .feed-item {
+      background: var(--card-bg);
+      border: 1px solid rgba(0, 240, 255, 0.1);
+      border-radius: 10px;
+      padding: 12px 16px;
+      font-size: 13.5px;
+      line-height: 1.5;
+      animation: fadeIn 0.3s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .feed-item.user {
+      border-left: 3px solid var(--cyan-glow);
+      background: rgba(0, 240, 255, 0.04);
+    }
+
+    .feed-item.friday {
+      border-left: 3px solid #6c5ce7;
+      background: rgba(108, 92, 231, 0.06);
+    }
+
+    .feed-item.tool {
+      border-left: 3px solid var(--amber-warn);
+      background: rgba(255, 183, 0, 0.05);
+      font-family: Consolas, monospace;
+      font-size: 12px;
+    }
+
+    .feed-header {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 4px;
+      color: var(--cyan-glow);
+      font-weight: 600;
+    }
+
+    /* Security Authorization Banner */
+    .security-modal {
+      display: none;
+      background: rgba(25, 12, 18, 0.95);
+      border: 1px solid var(--red-alert);
+      box-shadow: 0 0 20px rgba(255, 51, 102, 0.3);
+      padding: 14px 18px;
+      border-radius: 10px;
+      margin: 10px 20px;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .security-info {
+      font-size: 12px;
+    }
+
+    .security-info strong {
+      color: var(--red-alert);
+      text-transform: uppercase;
+      font-size: 13px;
+    }
+
+    .security-actions {
+      display: flex;
+      gap: 10px;
+    }
+
+    .btn {
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s;
+    }
+
+    .btn-approve {
+      background: #00b894;
+      color: #fff;
+    }
+
+    .btn-approve:hover {
+      background: #55efc4;
+      color: #000;
+    }
+
+    .btn-decline {
+      background: #d63031;
+      color: #fff;
+    }
+
+    .btn-decline:hover {
+      background: #ff7675;
+    }
+
+    /* Bottom Prompt Input */
+    .hud-input-bar {
+      padding: 12px 20px 16px;
+      border-top: 1px solid rgba(0, 240, 255, 0.12);
+      display: flex;
+      gap: 10px;
+      background: rgba(5, 10, 20, 0.4);
+      border-radius: 0 0 16px 16px;
+    }
+
+    .prompt-input {
+      flex: 1;
+      background: rgba(15, 25, 45, 0.8);
+      border: 1px solid rgba(0, 240, 255, 0.25);
+      border-radius: 10px;
+      padding: 10px 16px;
+      color: #fff;
+      font-size: 14px;
+      outline: none;
+      transition: all 0.25s;
+    }
+
+    .prompt-input:focus {
+      border-color: var(--cyan-glow);
+      box-shadow: 0 0 12px rgba(0, 240, 255, 0.25);
+      background: rgba(15, 25, 45, 0.95);
+    }
+
+    .action-btn {
+      background: linear-gradient(135deg, rgba(0, 240, 255, 0.2), rgba(0, 180, 255, 0.4));
+      border: 1px solid var(--cyan-glow);
+      color: #fff;
+      border-radius: 10px;
+      padding: 0 18px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+
+    .action-btn:hover {
+      background: var(--cyan-glow);
+      color: #000;
+      box-shadow: 0 0 15px var(--cyan-glow);
+    }
+  </style>
+</head>
+<body>
+  <div class="hud-container">
+    <!-- Top Header -->
+    <div class="hud-header">
+      <div class="brand-section">
+        <div class="reactor-core" id="reactorCore"></div>
+        <div class="title-group">
+          <h1>FRIDAY</h1>
+          <span id="statusSub">SYSTEM NOMINAL // STANDBY</span>
+        </div>
+      </div>
+      <div class="hud-telemetry">
+        <div class="badge">Brain: <span class="badge-value" id="brainModel">gemini-3.8-flash</span></div>
+        <div class="badge">GPU Policy: <span class="badge-value">0% ML</span></div>
+        <div class="badge">Vault: <span class="badge-value" id="vaultCount">--</span></div>
+        <button class="close-btn" onclick="closeHUD()" title="Minimize (Esc)">✕</button>
+      </div>
+    </div>
+
+    <!-- Audio Waveform Visualizer -->
+    <div class="waveform-bar">
+      <canvas id="waveformCanvas"></canvas>
+    </div>
+
+    <!-- Security Gate Banner -->
+    <div class="security-modal" id="securityModal">
+      <div class="security-info">
+        <strong>⚠️ IRREVERSIBLE ACTION DETECTED</strong>
+        <div id="securityDesc">Command: rm -rf /</div>
+      </div>
+      <div class="security-actions">
+        <button class="btn btn-approve" onclick="resolveSecurity(true)">Authorize [Y]</button>
+        <button class="btn btn-decline" onclick="resolveSecurity(false)">Decline [N]</button>
+      </div>
+    </div>
+
+    <!-- Activity Stream -->
+    <div class="activity-feed" id="activityFeed">
+      <div class="feed-item friday">
+        <div class="feed-header">FRIDAY SYSTEM</div>
+        Jarvis Ambient HUD initialized. Press <strong>Win + Alt + F</strong> anytime to toggle, or <strong>Win + Space</strong> to voice command.
+      </div>
+    </div>
+
+    <!-- Bottom Command Input -->
+    <div class="hud-input-bar">
+      <input 
+        type="text" 
+        class="prompt-input" 
+        id="promptInput" 
+        placeholder="Ask Friday, instruct a task, or query memory... (Press Enter to Send)" 
+        autofocus 
+        onkeydown="handleKey(event)"
+      />
+      <button class="action-btn" onclick="sendPrompt()">SEND</button>
+    </div>
+  </div>
+
+  <script>
+    let ws = null;
+    let isSpeaking = false;
+    let currentPendingAction = null;
+
+    // Connect WebSocket
+    function connectWS() {
+      const loc = window.location;
+      const wsUrl = `ws://${loc.host}/api/ws`;
+      ws = new WebSocket(wsUrl);
+
+      ws.onopen = () => {
+        document.getElementById("statusSub").innerText = "CONNECTED // REALTIME TELEMETRY";
+        fetchStatus();
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          handleTelemetry(data);
+        } catch (e) {
+          console.error("WS Parse error", e);
+        }
+      };
+
+      ws.onclose = () => {
+        document.getElementById("statusSub").innerText = "DISCONNECTED // RECONNECTING...";
+        setTimeout(connectWS, 2000);
+      };
+    }
+
+    function handleTelemetry(data) {
+      if (data.type === "TELEMETRY_EVENT") {
+        const payload = data.event.payload || {};
+        const eventType = data.event.event_type;
+
+        if (eventType === "TOOL_ACTION") {
+          addFeedItem("TOOL INVOCATION", `${payload.tool} with parameters ${JSON.stringify(payload.params)}`, "tool");
+        } else if (eventType === "RESPONSE_GENERATED") {
+          addFeedItem("FRIDAY", payload.response, "friday");
+          isSpeaking = true;
+          setTimeout(() => { isSpeaking = false; }, 3000);
+        }
+      } else if (data.type === "SECURITY_PROMPT") {
+        currentPendingAction = data.id;
+        document.getElementById("securityDesc").innerText = `${data.tool_name}: ${data.description}`;
+        document.getElementById("securityModal").style.display = "flex";
+      }
+    }
+
+    function addFeedItem(title, content, type = "friday") {
+      const feed = document.getElementById("activityFeed");
+      const item = document.createElement("div");
+      item.className = `feed-item ${type}`;
+      item.innerHTML = `<div class="feed-header">${title}</div><div>${content.replace(/\n/g, '<br>')}</div>`;
+      feed.appendChild(item);
+      feed.scrollTop = feed.scrollHeight;
+    }
+
+    function sendPrompt() {
+      const input = document.getElementById("promptInput");
+      const text = input.value.trim();
+      if (!text) return;
+
+      addFeedItem("USER", text, "user");
+      input.value = "";
+      document.getElementById("statusSub").innerText = "THINKING // CLOUD BRAIN ACTIVE";
+
+      fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: text })
+      })
+      .then(res => res.json())
+      .then(data => {
+        addFeedItem("FRIDAY", data.response, "friday");
+        document.getElementById("statusSub").innerText = "CONNECTED // STANDBY";
+        fetchStatus();
+      })
+      .catch(err => {
+        addFeedItem("SYSTEM ERROR", err.toString(), "tool");
+        document.getElementById("statusSub").innerText = "ERROR OCCURRED";
+      });
+    }
+
+    function handleKey(e) {
+      if (e.key === "Enter") {
+        sendPrompt();
+      } else if (e.key === "Escape") {
+        closeHUD();
+      }
+    }
+
+    function resolveSecurity(approved) {
+      document.getElementById("securityModal").style.display = "none";
+      if (ws && currentPendingAction) {
+        ws.send(JSON.stringify({
+          action: "SECURITY_RESPONSE",
+          id: currentPendingAction,
+          approved: approved
+        }));
+      }
+    }
+
+    function fetchStatus() {
+      fetch("/api/status")
+        .then(res => res.json())
+        .then(data => {
+          document.getElementById("brainModel").innerText = data.brain_model;
+          document.getElementById("vaultCount").innerText = `${data.obsidian_notes_count} Notes`;
+        })
+        .catch(console.error);
+    }
+
+    function closeHUD() {
+      if (window.pywebview) {
+        window.pywebview.api.hide();
+      } else {
+        document.body.style.opacity = "0.5";
+      }
+    }
+
+    // Audio Waveform Visualizer on Canvas
+    const canvas = document.getElementById("waveformCanvas");
+    const ctx = canvas.getContext("2d");
+    let phase = 0;
+
+    function renderWaveform() {
+      canvas.width = canvas.offsetWidth;
+      canvas.height = canvas.offsetHeight;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      const width = canvas.width;
+      const height = canvas.height;
+      const centerY = height / 2;
+
+      ctx.beginPath();
+      ctx.strokeStyle = isSpeaking ? "rgba(0, 240, 255, 0.85)" : "rgba(0, 240, 255, 0.25)";
+      ctx.lineWidth = isSpeaking ? 2.5 : 1.2;
+
+      const numPoints = 80;
+      const step = width / numPoints;
+
+      for (let i = 0; i <= numPoints; i++) {
+        const x = i * step;
+        const amp = isSpeaking ? Math.sin((i / 5) + phase) * 10 : Math.sin((i / 8) + phase) * 3;
+        const y = centerY + amp;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+
+      phase += isSpeaking ? 0.25 : 0.05;
+      requestAnimationFrame(renderWaveform);
+    }
+
+    window.onload = () => {
+      connectWS();
+      renderWaveform();
+    };
+  </script>
+</body>
+</html>
