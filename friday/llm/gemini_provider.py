@@ -133,6 +133,44 @@ class GeminiProvider:
                 return response.text or ""
             raise
 
+    def generate_with_image(self, prompt: str, image: Any) -> str:
+        """Generate response given a text prompt and an image (path, bytes, or PIL Image).
+
+        Args:
+            prompt: Text prompt / instruction.
+            image: File path string, bytes, or PIL Image instance.
+
+        Returns:
+            The model's text response.
+        """
+        if not self.is_configured():
+            raise ValueError(
+                "Gemini API key is not configured. Set GEMINI_API_KEY in your .env file."
+            )
+
+        from PIL import Image
+        import io
+
+        if isinstance(image, str):
+            img_obj = Image.open(image)
+        elif isinstance(image, bytes):
+            img_obj = Image.open(io.BytesIO(image))
+        else:
+            img_obj = image
+
+        try:
+            assert self._model is not None
+            response = self._model.generate_content([prompt, img_obj])
+            return response.text or ""
+        except Exception as exc:
+            if "not found" in str(exc).lower() and self.model_name != "gemini-1.5-flash":
+                self.model_name = "gemini-1.5-flash"
+                self._configure()
+                assert self._model is not None
+                response = self._model.generate_content([prompt, img_obj])
+                return response.text or ""
+            raise
+
     def reset_chat(self) -> None:
         """Reset the active chat session history."""
         if self._model is not None:

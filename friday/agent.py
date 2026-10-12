@@ -18,6 +18,8 @@ from friday.tools.builtin.coding_tools import (
     WriteFileTool,
 )
 from friday.tools.builtin.memory_tools import RecallTool, RememberTool
+from friday.tools.builtin.vision_tools import CaptureScreenTool
+from friday.tools.dynamic_manager import CreateSkillTool, DynamicSkillManager
 
 
 ACTION_PATTERN = re.compile(r"```(?:action|json:action)\s*(\{.*?\})\s*```", re.DOTALL)
@@ -32,6 +34,7 @@ class FridayAgent:
         permission_gate: Optional[PermissionGate] = None,
         memory_engine: Optional[HybridMemoryEngine] = None,
         workspace_dir: Optional[str] = None,
+        dynamic_skills_dir: Optional[str] = None,
     ) -> None:
         """Initialize the Friday Agent.
 
@@ -40,6 +43,7 @@ class FridayAgent:
             permission_gate: Tiered security permission gate. If None, instantiates default.
             memory_engine: Hybrid Obsidian vector + GraphRAG engine.
             workspace_dir: Base directory for local workspace files.
+            dynamic_skills_dir: Directory for hot-reloaded dynamic skills.
         """
         self.workspace_dir = workspace_dir or os.getcwd()
         self.llm = gemini_provider or GeminiProvider()
@@ -57,6 +61,16 @@ class FridayAgent:
         self.register_tool(WriteFileTool(self.workspace_dir))
         self.register_tool(PatchFileTool(self.workspace_dir))
         self.register_tool(BashExecuteTool(self.workspace_dir))
+
+        # Register Multimodal Vision tools
+        self.register_tool(CaptureScreenTool(gemini_provider=self.llm))
+
+        # Register Jarvis Protocol Dynamic Self-Evolution tools
+        self.skill_manager = DynamicSkillManager(
+            dynamic_dir=dynamic_skills_dir, agent=self
+        )
+        self.register_tool(CreateSkillTool(self.skill_manager))
+        self.skill_manager.discover_and_load_all()
 
         self._update_system_instructions()
 
