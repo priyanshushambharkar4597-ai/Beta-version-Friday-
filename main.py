@@ -38,12 +38,14 @@ BANNER = r"""
 
 HELP_TEXT = """
 Available Commands:
-  /help       - Show this help message
-  /clear      - Reset current conversation context
-  /tools      - List registered local tools and their safety tiers
-  /status     - Show hardware and connection status
-  /apikey     - Enter or update Gemini API key interactively
-  exit / quit - Shutdown Friday session
+  /help         - Show this help message
+  /clear        - Reset current conversation context
+  /tools        - List registered local tools and their safety tiers
+  /status       - Show hardware, connection, and memory status
+  /vault        - Inspect stored Obsidian Markdown notes and knowledge graph
+  /recall <q>   - Test hybrid vector search + 2-hop graph expansion
+  /apikey       - Enter or update Gemini API key interactively
+  exit / quit   - Shutdown Friday session
 """
 
 
@@ -135,12 +137,55 @@ def main() -> None:
                 continue
 
             if lower_input == "/status":
+                v_stats = agent.memory.graph_store.stats()
                 print("\n[System Status]")
                 print(f"  - Cloud Brain Model: {provider.model_name}")
                 print(f"  - Brain Online:      {provider.is_configured()}")
                 print(f"  - GPU Utilization:   0% (Enforced)")
+                print(f"  - Obsidian Notes:    {len(agent.memory.list_all_titles())}")
+                print(f"  - Vector Embeddings: {agent.memory.vector_store.count()}")
+                print(f"  - Graph Nodes/Edges: {v_stats['total_nodes']}/{v_stats['total_edges']}")
                 print(f"  - Registered Tools:  {len(agent.tools)}")
                 print(f"  - Audit Log Count:   {len(gate.audit_log)}\n")
+                continue
+
+            if lower_input == "/vault":
+                titles = agent.memory.list_all_titles()
+                v_stats = agent.memory.graph_store.stats()
+                print("\n[Obsidian Vault Overview]")
+                print(f"Location: {agent.memory.vault.vault_dir}")
+                print(f"Knowledge Graph: {v_stats['total_nodes']} nodes, {v_stats['total_edges']} connections\n")
+                if not titles:
+                    print("  No notes in vault yet. Try saying: 'remember: My Title - Content with [[Link]]'\n")
+                else:
+                    for t in titles:
+                        print(f"  - [[{t}]]")
+                    print()
+                continue
+
+            if lower_input.startswith("/recall"):
+                query = user_input[7:].strip()
+                if not query:
+                    print("Usage: /recall <search query>\n")
+                    continue
+                results = agent.memory.recall(query=query, top_k=2, max_hops=2)
+                print("\n" + "=" * 60)
+                print(f"HYBRID RECALL RESULTS for: '{query}'")
+                print("=" * 60)
+                if results["direct_matches"]:
+                    print("\n[Semantic Vector Matches]:")
+                    for m in results["direct_matches"]:
+                        print(f"  - [[{m['title']}]] (Similarity: {m['score']})")
+                        print(f"    Content: {m['content'][:120]}...\n")
+                else:
+                    print("No direct vector matches found.")
+
+                if results["graph_context"]:
+                    print("[2-Hop Knowledge Graph Connections]:")
+                    for g in results["graph_context"]:
+                        print(f"  - [[{g['title']}]] ({g['distance_hops']}-hop distance)")
+                    print()
+                print("=" * 60 + "\n")
                 continue
 
             if lower_input == "/apikey":
