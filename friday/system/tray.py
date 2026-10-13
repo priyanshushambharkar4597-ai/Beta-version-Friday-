@@ -9,7 +9,9 @@ import sys
 import threading
 import time
 from pathlib import Path
-from typing import Optional
+from dotenv import load_dotenv
+
+load_dotenv()
 
 from PIL import Image, ImageDraw
 

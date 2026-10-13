@@ -10,6 +10,10 @@ from typing import Any, Dict, List, Optional
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
+from dotenv import load_dotenv
+
+# Ensure .env is loaded whenever server is initialized
+load_dotenv()
 
 from friday.agent import FridayAgent
 from friday.event_bus import EventType, SystemEvent, SystemEventBus
@@ -182,7 +186,10 @@ def chat(request: ChatRequest) -> ChatResponse:
     bus = get_event_bus()
 
     bus.publish(EventType.TEXT_INPUT, {"message": request.message}, source="api")
-    reply = agent.process(request.message)
+    try:
+        reply = agent.process(request.message)
+    except Exception as exc:
+        reply = f"[!] Friday encountered an error: {exc}"
     bus.publish(EventType.RESPONSE_GENERATED, {"response": reply}, source="agent")
 
     return ChatResponse(

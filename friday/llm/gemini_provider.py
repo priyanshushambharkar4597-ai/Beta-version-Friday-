@@ -9,7 +9,10 @@ from typing import Any, Generator, List, Optional
 warnings.filterwarnings("ignore", category=FutureWarning)
 
 import google.generativeai as genai
+from dotenv import load_dotenv
 from google.generativeai.types import GenerationConfig
+
+load_dotenv()
 
 
 DEFAULT_SYSTEM_INSTRUCTION = """You are Friday, an ultra-advanced, loyal, highly capable personal AI assistant.
@@ -52,7 +55,7 @@ class GeminiProvider:
 
     def _configure(self) -> None:
         """Configure the genai client and prepare the model."""
-        genai.configure(api_key=self.api_key)
+        genai.configure(api_key=self.api_key, transport="rest")
         self._model = genai.GenerativeModel(
             model_name=self.model_name,
             system_instruction=self.system_instruction,
@@ -92,17 +95,19 @@ class GeminiProvider:
             )
         try:
             assert self._model is not None
-            response = self._model.generate_content(prompt)
+            response = self._model.generate_content(prompt, request_options={"retry": None})
             return response.text or ""
         except Exception as exc:
-            # Fallback to 1.5-flash if 2.0-flash is temporarily unavailable
-            if "not found" in str(exc).lower() and self.model_name != "gemini-1.5-flash":
+            err_str = str(exc).lower()
+            if "429" in err_str or "quota" in err_str:
+                return "Boss, our cloud brain reached the Gemini API free-tier quota limit. Please generate a fresh free API key at https://aistudio.google.com/ and update your .env file, or give me some time to recharge."
+            if "not found" in err_str and self.model_name != "gemini-1.5-flash":
                 self.model_name = "gemini-1.5-flash"
                 self._configure()
                 assert self._model is not None
-                response = self._model.generate_content(prompt)
+                response = self._model.generate_content(prompt, request_options={"retry": None})
                 return response.text or ""
-            raise
+            return f"I ran into an issue connecting to my cloud brain: {exc}"
 
     def chat(self, user_message: str) -> str:
         """Send a message within the stateful chat session.
@@ -121,17 +126,19 @@ class GeminiProvider:
             if self._chat is None:
                 assert self._model is not None
                 self._chat = self._model.start_chat(history=[])
-            response = self._chat.send_message(user_message)
+            response = self._chat.send_message(user_message, request_options={"retry": None})
             return response.text or ""
         except Exception as exc:
-            # Handle model fallback if needed
-            if "not found" in str(exc).lower() and self.model_name != "gemini-1.5-flash":
+            err_str = str(exc).lower()
+            if "429" in err_str or "quota" in err_str:
+                return "Boss, our cloud brain reached the Gemini API free-tier quota limit. Please generate a fresh free API key at https://aistudio.google.com/ and update your .env file, or give me some time to recharge."
+            if "not found" in err_str and self.model_name != "gemini-1.5-flash":
                 self.model_name = "gemini-1.5-flash"
                 self._configure()
                 assert self._chat is not None
-                response = self._chat.send_message(user_message)
+                response = self._chat.send_message(user_message, request_options={"retry": None})
                 return response.text or ""
-            raise
+            return f"I ran into an issue connecting to my cloud brain: {exc}"
 
     def generate_with_image(self, prompt: str, image: Any) -> str:
         """Generate response given a text prompt and an image (path, bytes, or PIL Image).
