@@ -18,4 +18,6 @@ htmlcov/
 
 # Friday Local Storage & Dynamic Cache
 vault/
+backups/
+data/
 *.log
