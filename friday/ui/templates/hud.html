@@ -377,6 +377,7 @@
         autofocus 
         onkeydown="handleKey(event)"
       />
+      <button class="action-btn" id="voiceBtn" onclick="toggleVoice()" title="Push-to-Talk Voice Command (Ctrl+Space)" style="background: rgba(0, 240, 255, 0.15);">🎙️ VOICE</button>
       <button class="action-btn" onclick="sendPrompt()">SEND</button>
     </div>
   </div>
@@ -385,6 +386,9 @@
     let ws = null;
     let isSpeaking = false;
     let currentPendingAction = null;
+    let mediaRecorder = null;
+    let audioChunks = [];
+    let isRecordingAudio = false;
 
     // Connect WebSocket
     function connectWS() {
@@ -417,17 +421,76 @@
         const payload = data.event.payload || {};
         const eventType = data.event.event_type;
 
-        if (eventType === "TOOL_ACTION") {
+        if (eventType === "VOICE_INPUT") {
+          addFeedItem("VOICE INPUT", "Listening to microphone...", "user");
+          document.getElementById("statusSub").innerText = "VOICE ACTIVE // LISTENING TO MIC...";
+          isSpeaking = true;
+        } else if (eventType === "TOOL_ACTION") {
           addFeedItem("TOOL INVOCATION", `${payload.tool} with parameters ${JSON.stringify(payload.params)}`, "tool");
         } else if (eventType === "RESPONSE_GENERATED") {
           addFeedItem("FRIDAY", payload.response, "friday");
+          document.getElementById("statusSub").innerText = "CONNECTED // REALTIME TELEMETRY";
           isSpeaking = true;
-          setTimeout(() => { isSpeaking = false; }, 3000);
+          setTimeout(() => { isSpeaking = false; }, 3500);
         }
       } else if (data.type === "SECURITY_PROMPT") {
         currentPendingAction = data.id;
         document.getElementById("securityDesc").innerText = `${data.tool_name}: ${data.description}`;
         document.getElementById("securityModal").style.display = "flex";
+      }
+    }
+
+    async function toggleVoice() {
+      const btn = document.getElementById("voiceBtn");
+      if (!isRecordingAudio) {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          audioChunks = [];
+          mediaRecorder = new MediaRecorder(stream);
+          mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
+          mediaRecorder.onstop = async () => {
+            const audioBlob = new Blob(audioChunks, { type: "audio/wav" });
+            stream.getTracks().forEach(t => t.stop());
+            sendAudioBlob(audioBlob);
+          };
+          mediaRecorder.start();
+          isRecordingAudio = true;
+          btn.innerText = "⏹ STOP";
+          btn.style.background = "rgba(255, 51, 102, 0.5)";
+          btn.style.borderColor = "#ff3366";
+          document.getElementById("statusSub").innerText = "VOICE ACTIVE // LISTENING TO MIC...";
+          isSpeaking = true;
+        } catch (err) {
+          console.error("Microphone access error:", err);
+          addFeedItem("MICROPHONE NOTICE", "Push-to-Talk is active! Press and release Ctrl+Space or Win+Space from your keyboard.", "tool");
+        }
+      } else {
+        if (mediaRecorder && mediaRecorder.state !== "inactive") {
+          mediaRecorder.stop();
+        }
+        isRecordingAudio = false;
+        btn.innerText = "🎙️ VOICE";
+        btn.style.background = "rgba(0, 240, 255, 0.15)";
+        btn.style.borderColor = "var(--cyan-glow)";
+        document.getElementById("statusSub").innerText = "THINKING // CLOUD BRAIN ACTIVE";
+      }
+    }
+
+    async function sendAudioBlob(blob) {
+      addFeedItem("VOICE INPUT", "Spoken audio captured — sending to Cloud Brain...", "user");
+      try {
+        const res = await fetch("/api/voice", {
+          method: "POST",
+          headers: { "Content-Type": "audio/wav" },
+          body: blob
+        });
+        const data = await res.json();
+        addFeedItem("FRIDAY", data.response, "friday");
+        document.getElementById("statusSub").innerText = "CONNECTED // STANDBY";
+        fetchStatus();
+      } catch (err) {
+        addFeedItem("VOICE ERROR", err.toString(), "tool");
+        document.getElementById("statusSub").innerText = "ERROR OCCURRED";
       }
     }
 

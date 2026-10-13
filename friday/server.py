@@ -7,7 +7,7 @@ import json
 import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
@@ -197,6 +197,28 @@ def chat(request: ChatRequest) -> ChatResponse:
         brain_model=agent.llm.model_name,
         brain_online=agent.llm.is_configured(),
     )
+
+
+@app.post("/api/voice")
+async def voice_endpoint(request: Request) -> Dict[str, Any]:
+    """Process speech-to-speech audio WAV bytes directly from HUD or microphone stream."""
+    audio_bytes = await request.body()
+    agent = get_agent()
+    bus = get_event_bus()
+
+    bus.publish(EventType.VOICE_INPUT, {"size_bytes": len(audio_bytes)}, source="api")
+    try:
+        reply = agent.handle_audio(audio_bytes)
+    except Exception as exc:
+        reply = f"[!] Friday encountered a voice thinking error: {exc}"
+
+    bus.publish(EventType.RESPONSE_GENERATED, {"response": reply}, source="agent")
+
+    return {
+        "response": reply,
+        "brain_model": agent.llm.model_name,
+        "brain_online": agent.llm.is_configured(),
+    }
 
 
 @app.post("/api/remember")

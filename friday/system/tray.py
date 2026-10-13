@@ -16,6 +16,7 @@ load_dotenv()
 from PIL import Image, ImageDraw
 
 from friday.ui.overlay import HUDOverlay
+from friday.voice.microphone import MicrophoneRecorder
 from friday.voice.tts import FridayTTS
 
 logger = logging.getLogger("friday.system.tray")
@@ -49,6 +50,7 @@ class FridayTrayDaemon:
         self.server_port = server_port
         self.enable_hotkeys = enable_hotkeys
 
+        self.recorder = MicrophoneRecorder()
         self.tts = FridayTTS()
         self.tts_muted = False
         self.running = False
@@ -90,8 +92,52 @@ class FridayTrayDaemon:
 
             def on_activate_voice():
                 logger.info("Global hotkey triggered: Push-to-Talk")
-                if not self.tts_muted:
-                    self.tts.speak("Listening, boss.")
+                if self.recorder.is_recording:
+                    # User triggered hotkey again to finish speaking
+                    logger.info("Finishing voice recording...")
+                    audio_bytes = self.recorder.stop_recording()
+                    if len(audio_bytes) > 800:
+                        def _process_speech():
+                            try:
+                                from friday.server import get_agent, get_event_bus
+                                from friday.event_bus import EventType
+                                bus = get_event_bus()
+                                bus.publish(
+                                    EventType.VOICE_INPUT,
+                                    {"state": "processing", "size": len(audio_bytes)},
+                                    source="voice",
+                                )
+                                agent = get_agent()
+                                reply = agent.handle_audio(audio_bytes)
+                                logger.info(f"Friday spoken reply: {reply}")
+                                bus.publish(
+                                    EventType.RESPONSE_GENERATED,
+                                    {"response": reply},
+                                    source="agent",
+                                )
+                                if not self.tts_muted:
+                                    self.tts.speak(reply, async_playback=True)
+                            except Exception as exc:
+                                logger.warning(f"Voice processing notice: {exc}")
+
+                        threading.Thread(target=_process_speech, daemon=True).start()
+                else:
+                    # Halt any ongoing speech (Barge-In)
+                    self.tts.stop()
+                    # Start microphone capture
+                    started = self.recorder.start_recording()
+                    if started:
+                        try:
+                            from friday.server import get_event_bus
+                            from friday.event_bus import EventType
+                            get_event_bus().publish(
+                                EventType.VOICE_INPUT,
+                                {"state": "listening"},
+                                source="voice",
+                            )
+                        except Exception:
+                            pass
+                        logger.info("Voice recording active (listening to microphone)...")
 
             # Register hotkeys for HUD and Voice
             hotkeys = keyboard.GlobalHotKeys({

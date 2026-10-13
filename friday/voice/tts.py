@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
+import threading
 from pathlib import Path
 from typing import Optional
 
@@ -23,22 +24,53 @@ class FridayTTS:
             piper_binary: Optional path to piper executable if configured.
         """
         self.piper_binary = piper_binary
+        self._current_process: Optional[subprocess.Popen] = None
+        self._lock = threading.Lock()
 
-    def speak(self, text: str) -> bool:
-        """Speak text aloud through the default audio output.
+    def is_speaking(self) -> bool:
+        """Check if TTS audio is currently playing."""
+        with self._lock:
+            return bool(self._current_process and self._current_process.poll() is None)
+
+    def stop(self) -> bool:
+        """Immediately halt any ongoing audio synthesis/playback (Barge-In)."""
+        with self._lock:
+            if self._current_process and self._current_process.poll() is None:
+                try:
+                    self._current_process.terminate()
+                except Exception:
+                    pass
+                self._current_process = None
+                return True
+        return False
+
+    def speak(self, text: str, async_playback: bool = False) -> bool:
+        """Speak text aloud through the default audio output with Barge-In support.
 
         Args:
             text: Text to synthesize.
+            async_playback: If True, executes synthesis non-blockingly.
 
         Returns:
-            True if speech succeeded, False otherwise.
+            True if speech started/succeeded, False otherwise.
         """
         cleaned = text.replace('"', '""').replace("`", "")
         if not cleaned.strip():
             return True
 
+        if async_playback:
+            thread = threading.Thread(target=self._speak_sync, args=(cleaned,), daemon=True)
+            thread.start()
+            return True
+
+        return self._speak_sync(cleaned)
+
+    def _speak_sync(self, cleaned: str) -> bool:
+        """Execute speech synthesis process and track handle for interruption."""
+        # Stop any existing speech playback first
+        self.stop()
+
         if sys.platform == "win32":
-            # Native Windows System.Speech synthesizer running 100% on CPU
             ps_script = (
                 f'Add-Type -AssemblyName System.Speech; '
                 f'$synth = [System.Speech.Synthesis.SpeechSynthesizer]::new(); '
@@ -46,20 +78,33 @@ class FridayTTS:
                 f'$synth.Speak("{cleaned}");'
             )
             try:
-                proc = subprocess.run(
-                    ["powershell.exe", "-NoProfile", "-Command", ps_script],
-                    capture_output=True,
-                    timeout=30,
-                )
-                return proc.returncode == 0
-            except Exception:
-                return False
-        else:
-            # Fallback for Linux/macOS
-            try:
-                subprocess.run(["espeak", cleaned], capture_output=True, timeout=10)
+                with self._lock:
+                    self._current_process = subprocess.Popen(
+                        ["powershell.exe", "-NoProfile", "-Command", ps_script],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                    )
+                self._current_process.wait(timeout=30)
+                with self._lock:
+                    self._current_process = None
                 return True
             except Exception:
+                self.stop()
+                return False
+        else:
+            try:
+                with self._lock:
+                    self._current_process = subprocess.Popen(
+                        ["espeak", cleaned],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                    )
+                self._current_process.wait(timeout=10)
+                with self._lock:
+                    self._current_process = None
+                return True
+            except Exception:
+                self.stop()
                 return False
 
     def synthesize_to_file(self, text: str, out_path: str) -> bool:

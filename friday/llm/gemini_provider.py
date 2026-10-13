@@ -188,6 +188,41 @@ class GeminiProvider:
                 return response.text or ""
             raise
 
+    def generate_with_audio(self, prompt: str, audio_bytes: bytes) -> str:
+        """Generate response given a text prompt/instruction and raw audio WAV bytes.
+
+        Args:
+            prompt: Text prompt / instruction.
+            audio_bytes: Raw 16kHz WAV or PCM audio bytes.
+
+        Returns:
+            The model's text response.
+        """
+        if not self.is_configured():
+            raise ValueError(
+                "Gemini API key is not configured. Set GEMINI_API_KEY in your .env file."
+            )
+
+        from google.generativeai.types import content_types
+        audio_blob = content_types.to_blob({"mime_type": "audio/wav", "data": audio_bytes})
+
+        models_to_try = [self.model_name] + [m for m in FALLBACK_MODELS if m != self.model_name]
+        for candidate in models_to_try:
+            try:
+                if candidate != self.model_name or self._model is None:
+                    self.model_name = candidate
+                    self._configure()
+                assert self._model is not None
+                response = self._model.generate_content([audio_blob, prompt], request_options={"retry": None})
+                return response.text or ""
+            except Exception as exc:
+                err_str = str(exc).lower()
+                if any(x in err_str for x in ("429", "quota", "not found", "503", "unavailable")):
+                    continue
+                return f"I ran into an issue processing audio with my cloud brain: {exc}"
+
+        return "Boss, our cloud brain reached the daily quota across available free-tier Gemini models. Please generate a fresh free API key at https://aistudio.google.com/ and update your .env file, or give me some time to recharge."
+
     def reset_chat(self) -> None:
         """Reset the active chat session history."""
         if self._model is not None:

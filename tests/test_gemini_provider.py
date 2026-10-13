@@ -29,7 +29,7 @@ def test_gemini_provider_configured(mock_model_cls, mock_configure):
 
     result = provider.generate("Greetings")
     assert result == "Hello boss, Friday is online."
-    mock_configure.assert_called_once_with(api_key="test_dummy_key_123")
+    mock_configure.assert_called_once_with(api_key="test_dummy_key_123", transport="rest")
 
 
 @patch("friday.llm.gemini_provider.genai.configure")
@@ -46,4 +46,4 @@ def test_gemini_provider_chat(mock_model_cls, mock_configure):
     provider = GeminiProvider(api_key="test_dummy_key_123")
     res = provider.chat("Status report")
     assert res == "System nominal."
-    mock_chat_session.send_message.assert_called_once_with("Status report")
+    mock_chat_session.send_message.assert_called_once_with("Status report", request_options={"retry": None})

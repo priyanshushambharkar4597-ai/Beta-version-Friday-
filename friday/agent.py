@@ -286,6 +286,88 @@ class FridayAgent:
 
         return final_response
 
+    def handle_audio(self, audio_bytes: bytes, max_iterations: int = 5) -> str:
+        """Process spoken user audio through Gemini multimodal speech-to-speech loop.
+
+        Args:
+            audio_bytes: 16kHz mono WAV audio bytes recorded from microphone.
+            max_iterations: Maximum tool call iterations.
+
+        Returns:
+            Friday's synthesized text response (concise, spoken format).
+        """
+        if not self.llm.is_configured():
+            return (
+                "[!] [Friday Configuration Required]\n"
+                "I am ready, but my cloud brain (Gemini API) is not connected yet.\n"
+                "Please add your GEMINI_API_KEY to the .env file in the project root."
+            )
+
+        instruction = (
+            "Listen to the user's spoken audio request carefully.\n"
+            "If the user asks you to remember, save, inspect, code, or execute any tool, output an action block:\n"
+            "```action\n"
+            "{\n"
+            '  "tool": "<tool_name>",\n'
+            '  "parameters": { ... }\n'
+            "}\n"
+            "```\n"
+            "Otherwise, formulate a direct, natural, concise conversational spoken reply suited for Text-To-Speech output."
+        )
+
+        try:
+            model_reply = self.llm.generate_with_audio(instruction, audio_bytes)
+        except Exception as exc:
+            return f"I ran into an issue processing your audio: {exc}"
+
+        # Check if the model requested any tool executions
+        action_matches = ACTION_PATTERN.findall(model_reply)
+        if not action_matches:
+            # Check for direct manual remember intent in audio transcript
+            remember_match = re.match(
+                r"^remember(?:\s*that|\s*:)\s*(.+)$", model_reply.strip(), re.IGNORECASE
+            )
+            if remember_match:
+                raw_memory = remember_match.group(1).strip()
+                words = raw_memory.split()
+                title = " ".join(words[:4]).title()
+                res = self.execute_tool(
+                    "remember",
+                    {"title": title, "content": raw_memory, "category": "spoken_memory"},
+                )
+                return f"I've saved {title} to your Obsidian vault."
+            return model_reply
+
+        # Execute actions if produced
+        observations: List[str] = []
+        for match in action_matches:
+            try:
+                action_data = json.loads(match.strip())
+                tool_name = action_data.get("tool", "")
+                params = action_data.get("parameters", {})
+
+                try:
+                    tool_result = self.execute_tool(tool_name, params)
+                    obs_str = json.dumps(tool_result, indent=2) if isinstance(tool_result, (dict, list)) else str(tool_result)
+                    observations.append(f"[Observation for {tool_name}]:\n{obs_str}")
+                except PermissionError as perm_err:
+                    observations.append(f"[Security Gate]: User declined permission for action '{tool_name}'. {str(perm_err)}")
+                except Exception as tool_err:
+                    observations.append(f"[Tool Execution Error in {tool_name}]: {str(tool_err)}")
+            except json.JSONDecodeError as json_err:
+                observations.append(f"[Action Parse Error]: Invalid JSON in action block: {str(json_err)}")
+
+        followup_prompt = (
+            f"Here are the local tool execution results:\n"
+            f"{chr(10).join(observations)}\n\n"
+            f"Provide a natural, concise spoken confirmation aloud to the user."
+        )
+        try:
+            final_reply = self.llm.chat(followup_prompt)
+            return final_reply
+        except Exception:
+            return model_reply
+
     def reset_conversation(self) -> None:
         """Reset the conversation context."""
         self.llm.reset_chat()
