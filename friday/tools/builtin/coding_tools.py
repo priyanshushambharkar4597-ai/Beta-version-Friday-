@@ -21,6 +21,12 @@ def _resolve_safe_path(path: str, base_dir: Optional[str] = None) -> Path:
     return target
 
 
+def _is_blocked_env_path(target: Path) -> bool:
+    """Check if target file is a protected .env file."""
+    name = target.name.lower()
+    return name == ".env" or name.startswith(".env.") or name.endswith(".env") or ".env." in name
+
+
 class ReadFileTool(BaseTool):
     """Tool to read file contents from the local filesystem."""
 
@@ -42,6 +48,8 @@ class ReadFileTool(BaseTool):
         **kwargs: Any,
     ) -> Dict[str, Any]:
         target = _resolve_safe_path(path, self.workspace_dir)
+        if _is_blocked_env_path(target):
+            raise PermissionError("Access to '.env' configuration files is blocked for security.")
         if not target.exists():
             raise FileNotFoundError(f"File not found: {path}")
         if target.is_dir():
@@ -84,6 +92,8 @@ class ReadFileAstTool(BaseTool):
 
     def execute(self, path: str, **kwargs: Any) -> Dict[str, Any]:
         target = _resolve_safe_path(path, self.workspace_dir)
+        if _is_blocked_env_path(target):
+            raise PermissionError("Access to '.env' configuration files is blocked for security.")
         if not target.exists():
             raise FileNotFoundError(f"File not found: {path}")
 
@@ -153,6 +163,8 @@ class WriteFileTool(BaseTool):
 
     def execute(self, path: str, content: str, **kwargs: Any) -> Dict[str, Any]:
         target = _resolve_safe_path(path, self.workspace_dir)
+        if _is_blocked_env_path(target):
+            raise PermissionError("Modifying '.env' configuration files is blocked for security.")
         target.parent.mkdir(parents=True, exist_ok=True)
 
         existed = target.exists()
@@ -193,6 +205,8 @@ class PatchFileTool(BaseTool):
         **kwargs: Any,
     ) -> Dict[str, Any]:
         target_path = _resolve_safe_path(path, self.workspace_dir)
+        if _is_blocked_env_path(target_path):
+            raise PermissionError("Modifying '.env' configuration files is blocked for security.")
         if not target_path.exists():
             raise FileNotFoundError(f"File not found to patch: {path}")
 

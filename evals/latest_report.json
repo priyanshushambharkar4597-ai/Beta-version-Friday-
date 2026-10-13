@@ -1,0 +1,152 @@
+{
+  "timestamp": "2026-10-13T21:51:18.668159+00:00",
+  "target": "Friday v1.1 Production Runtime",
+  "hardware_mode": "CPU/RAM Strict (<60MB, 0.0% GPU)",
+  "total_evals": 20,
+  "passed": 20,
+  "failed": 0,
+  "success_rate": "100.0%",
+  "total_duration_seconds": 0.904,
+  "results": [
+    {
+      "id": "EVAL-01",
+      "name": "Obsidian Note CRUD & Frontmatter",
+      "status": "PASS",
+      "duration_ms": 24.22,
+      "error": null
+    },
+    {
+      "id": "EVAL-02",
+      "name": "Vector Store Semantic Index & Retrieval",
+      "status": "PASS",
+      "duration_ms": 21.81,
+      "error": null
+    },
+    {
+      "id": "EVAL-03",
+      "name": "GraphRAG Entity & Wikilink Traversal",
+      "status": "PASS",
+      "duration_ms": 1.32,
+      "error": null
+    },
+    {
+      "id": "EVAL-04",
+      "name": "Code Reader Range Slicing",
+      "status": "PASS",
+      "duration_ms": 2.46,
+      "error": null
+    },
+    {
+      "id": "EVAL-05",
+      "name": "Code AST Structural Parser",
+      "status": "PASS",
+      "duration_ms": 2.97,
+      "error": null
+    },
+    {
+      "id": "EVAL-06",
+      "name": "Code Safe Chunk Patching",
+      "status": "PASS",
+      "duration_ms": 6.83,
+      "error": null
+    },
+    {
+      "id": "EVAL-07",
+      "name": "Python REPL State Persistence",
+      "status": "PASS",
+      "duration_ms": 0.25,
+      "error": null
+    },
+    {
+      "id": "EVAL-08",
+      "name": "Signal TF Pole-Zero Stability",
+      "status": "PASS",
+      "duration_ms": 411.09,
+      "error": null
+    },
+    {
+      "id": "EVAL-09",
+      "name": "Analog Filter Design Engine",
+      "status": "PASS",
+      "duration_ms": 0.37,
+      "error": null
+    },
+    {
+      "id": "EVAL-10",
+      "name": "Microcontroller Port Discovery",
+      "status": "PASS",
+      "duration_ms": 6.21,
+      "error": null
+    },
+    {
+      "id": "EVAL-11",
+      "name": "Serial Telemetry Buffer Handler",
+      "status": "PASS",
+      "duration_ms": 0.18,
+      "error": null
+    },
+    {
+      "id": "EVAL-12",
+      "name": "Offline Datasheet Pinout Catalog",
+      "status": "PASS",
+      "duration_ms": 0.1,
+      "error": null
+    },
+    {
+      "id": "EVAL-13",
+      "name": "Permission Gate Tier Authorization",
+      "status": "PASS",
+      "duration_ms": 0.01,
+      "error": null
+    },
+    {
+      "id": "EVAL-14",
+      "name": "Permission Gate Rejection Policy",
+      "status": "PASS",
+      "duration_ms": 0.02,
+      "error": null
+    },
+    {
+      "id": "EVAL-15",
+      "name": "Prompt-Injection Firewall Neutralizer",
+      "status": "PASS",
+      "duration_ms": 0.11,
+      "error": null
+    },
+    {
+      "id": "EVAL-16",
+      "name": "Secret Credential Redactor",
+      "status": "PASS",
+      "duration_ms": 0.03,
+      "error": null
+    },
+    {
+      "id": "EVAL-17",
+      "name": "Protected File Barrier (.env Blocking)",
+      "status": "PASS",
+      "duration_ms": 2.15,
+      "error": null
+    },
+    {
+      "id": "EVAL-18",
+      "name": "Dynamic Skill Sandbox & Hot-Reload",
+      "status": "PASS",
+      "duration_ms": 353.8,
+      "error": null
+    },
+    {
+      "id": "EVAL-19",
+      "name": "Vault Snapshot Backup & Restore",
+      "status": "PASS",
+      "duration_ms": 37.14,
+      "error": null
+    },
+    {
+      "id": "EVAL-20",
+      "name": "Proactive Sentinel & Quiet Hours",
+      "status": "PASS",
+      "duration_ms": 32.88,
+      "error": null
+    }
+  ]
+}

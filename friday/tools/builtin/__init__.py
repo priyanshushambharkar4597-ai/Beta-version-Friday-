@@ -1,5 +1,8 @@
-"""Built-in tools for Friday."""
-
+from friday.memory.backup import (
+    BackupVaultTool,
+    ListVaultBackupsTool,
+    RestoreVaultBackupTool,
+)
 from friday.system.autostart import (
     DisableAutostartTool,
     EnableAutostartTool,
@@ -48,4 +51,7 @@ __all__ = [
     "EnableAutostartTool",
     "DisableAutostartTool",
     "GetAutostartStatusTool",
+    "BackupVaultTool",
+    "ListVaultBackupsTool",
+    "RestoreVaultBackupTool",
 ]

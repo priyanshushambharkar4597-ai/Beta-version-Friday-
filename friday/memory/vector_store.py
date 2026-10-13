@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
 import os
@@ -73,9 +74,18 @@ class VectorStore:
         self.api_key = api_key or os.getenv("GEMINI_API_KEY")
         self._init_db()
 
+    @contextlib.contextmanager
+    def _connection(self):
+        """Context manager to guarantee SQLite connection closes immediately on Windows."""
+        conn = sqlite3.connect(self.db_path)
+        try:
+            yield conn
+        finally:
+            conn.close()
+
     def _init_db(self) -> None:
         """Create sqlite tables if not present."""
-        with sqlite3.connect(self.db_path) as conn:
+        with self._connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
                 """
@@ -146,7 +156,7 @@ class VectorStore:
         meta_json = json.dumps(metadata or {})
         vec_bytes = vector.astype(np.float32).tobytes()
 
-        with sqlite3.connect(self.db_path) as conn:
+        with self._connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
                 """
@@ -185,7 +195,7 @@ class VectorStore:
             return []
         query_vec = query_vec / q_norm
 
-        with sqlite3.connect(self.db_path) as conn:
+        with self._connection() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT id, text, metadata, vector, dimension FROM memory_vectors")
             rows = cursor.fetchall()
@@ -235,7 +245,7 @@ class VectorStore:
 
     def delete(self, node_id: str) -> bool:
         """Delete vector entry by node ID."""
-        with sqlite3.connect(self.db_path) as conn:
+        with self._connection() as conn:
             cursor = conn.cursor()
             cursor.execute("DELETE FROM memory_vectors WHERE id = ?", (node_id,))
             conn.commit()
@@ -243,7 +253,7 @@ class VectorStore:
 
     def count(self) -> int:
         """Count total stored vectors."""
-        with sqlite3.connect(self.db_path) as conn:
+        with self._connection() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT COUNT(*) FROM memory_vectors")
             row = cursor.fetchone()

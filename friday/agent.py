@@ -6,10 +6,19 @@ import json
 import os
 from pathlib import Path
 import re
+import time
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from friday.llm.gemini_provider import GeminiProvider
+from friday.memory.backup import (
+    BackupVaultTool,
+    ListVaultBackupsTool,
+    RestoreVaultBackupTool,
+    VaultBackupManager,
+)
 from friday.memory.retriever import HybridMemoryEngine
+from friday.security.audit import AuditLogger
+from friday.security.firewall import scan_for_injection, wrap_untrusted_data
 from friday.tools.base import BaseTool, PermissionGate, PermissionTier
 from friday.tools.builtin.coding_tools import (
     BashExecuteTool,
@@ -51,6 +60,7 @@ class FridayAgent:
         memory_engine: Optional[HybridMemoryEngine] = None,
         workspace_dir: Optional[str] = None,
         dynamic_skills_dir: Optional[str] = None,
+        audit_logger: Optional[AuditLogger] = None,
     ) -> None:
         """Initialize the Friday Agent.
 
@@ -60,17 +70,26 @@ class FridayAgent:
             memory_engine: Hybrid Obsidian vector + GraphRAG engine.
             workspace_dir: Base directory for local workspace files.
             dynamic_skills_dir: Directory for hot-reloaded dynamic skills.
+            audit_logger: Structured audit logger. If None, instantiates default.
         """
         self.workspace_dir = workspace_dir or os.getcwd()
         self.llm = gemini_provider or GeminiProvider()
         self.gate = permission_gate or PermissionGate()
         self.memory = memory_engine or HybridMemoryEngine()
+        self.audit_logger = audit_logger or AuditLogger()
         self.tools: Dict[str, BaseTool] = {}
 
         # Register Memory tools
         self.register_tool(RememberTool(self.memory))
         self.register_tool(RecallTool(self.memory))
         self.register_tool(UpdateCoreMemoryTool(memory_engine=self.memory))
+
+        # Register Vault Snapshot Backup & Restore tools
+        vault_dir = str(self.memory.vault.vault_dir) if hasattr(self.memory, "vault") else "vault"
+        self.backup_mgr = VaultBackupManager(vault_dir=vault_dir)
+        self.register_tool(BackupVaultTool(self.backup_mgr))
+        self.register_tool(ListVaultBackupsTool(self.backup_mgr))
+        self.register_tool(RestoreVaultBackupTool(self.backup_mgr))
 
         # Register Developer Workspace tools
         self.register_tool(ReadFileTool(self.workspace_dir))
@@ -174,7 +193,7 @@ class FridayAgent:
         parameters: Dict[str, Any],
         action_description: Optional[str] = None,
     ) -> Any:
-        """Execute a tool through the tiered permission gate.
+        """Execute a tool through the tiered permission gate and audit logger.
 
         Args:
             tool_name: Name of registered tool.
@@ -188,6 +207,7 @@ class FridayAgent:
             KeyError: Tool not registered.
             PermissionError: User declined irreversible action.
         """
+        start_time = time.perf_counter()
         tool = self.get_tool(tool_name)
         if not tool:
             raise KeyError(f"Tool '{tool_name}' is not registered.")
@@ -200,7 +220,10 @@ class FridayAgent:
             params=parameters,
         )
 
+        tier_str = tool.tier.value if hasattr(tool.tier, "value") else str(tool.tier)
+
         if not authorized:
+            latency_ms = (time.perf_counter() - start_time) * 1000
             self.gate.log_execution(
                 tool_name=tool_name,
                 tier=tool.tier,
@@ -208,10 +231,19 @@ class FridayAgent:
                 approved=False,
                 error="Action denied by permission gate.",
             )
+            self.audit_logger.log_execution(
+                tool_name=tool_name,
+                tier=tier_str,
+                parameters=parameters,
+                latency_ms=latency_ms,
+                success=False,
+                error="Action denied by permission gate.",
+            )
             raise PermissionError(f"Action '{tool_name}' was declined by user.")
 
         try:
             result = tool.execute(**parameters)
+            latency_ms = (time.perf_counter() - start_time) * 1000
             self.gate.log_execution(
                 tool_name=tool_name,
                 tier=tool.tier,
@@ -219,13 +251,29 @@ class FridayAgent:
                 approved=True,
                 result=result,
             )
+            self.audit_logger.log_execution(
+                tool_name=tool_name,
+                tier=tier_str,
+                parameters=parameters,
+                latency_ms=latency_ms,
+                success=True,
+            )
             return result
         except Exception as exc:
+            latency_ms = (time.perf_counter() - start_time) * 1000
             self.gate.log_execution(
                 tool_name=tool_name,
                 tier=tool.tier,
                 params=parameters,
                 approved=True,
+                error=str(exc),
+            )
+            self.audit_logger.log_execution(
+                tool_name=tool_name,
+                tier=tier_str,
+                parameters=parameters,
+                latency_ms=latency_ms,
+                success=False,
                 error=str(exc),
             )
             raise
@@ -320,7 +368,8 @@ class FridayAgent:
                     try:
                         tool_result = self.execute_tool(tool_name, params)
                         obs_str = json.dumps(tool_result, indent=2) if isinstance(tool_result, (dict, list)) else str(tool_result)
-                        observations.append(f"[Observation for {tool_name}]:\n{obs_str}")
+                        wrapped_obs = wrap_untrusted_data(tool_name, obs_str)
+                        observations.append(f"[Observation for {tool_name}]:\n{wrapped_obs}")
                     except PermissionError as perm_err:
                         observations.append(f"[Security Gate]: User declined permission for action '{tool_name}'. {str(perm_err)}")
                     except Exception as tool_err:
@@ -398,7 +447,8 @@ class FridayAgent:
                 try:
                     tool_result = self.execute_tool(tool_name, params)
                     obs_str = json.dumps(tool_result, indent=2) if isinstance(tool_result, (dict, list)) else str(tool_result)
-                    observations.append(f"[Observation for {tool_name}]:\n{obs_str}")
+                    wrapped_obs = wrap_untrusted_data(tool_name, obs_str)
+                    observations.append(f"[Observation for {tool_name}]:\n{wrapped_obs}")
                 except PermissionError as perm_err:
                     observations.append(f"[Security Gate]: User declined permission for action '{tool_name}'. {str(perm_err)}")
                 except Exception as tool_err:
