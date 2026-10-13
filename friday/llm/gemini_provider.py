@@ -25,6 +25,14 @@ Keep responses clear, sharp, technically precise, and natural. Explain non-obvio
 """
 
 
+FALLBACK_MODELS = [
+    "gemini-3.6-flash",
+    "gemini-3.5-flash",
+    "gemini-3.8-flash",
+    "gemini-flash-latest",
+]
+
+
 class GeminiProvider:
     """Adapter for Google AI Studio Gemini API."""
 
@@ -39,12 +47,12 @@ class GeminiProvider:
 
         Args:
             api_key: Google AI Studio API key. If None, reads from GEMINI_API_KEY env var.
-            model_name: Gemini model identifier (default: gemini-2.0-flash or gemini-1.5-flash).
+            model_name: Gemini model identifier (default: gemini-3.6-flash).
             system_instruction: Base persona instructions.
             temperature: Creativity control (0.0 to 1.0).
         """
         self.api_key = api_key or os.getenv("GEMINI_API_KEY")
-        self.model_name = model_name or os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
+        self.model_name = model_name or os.getenv("GEMINI_MODEL", "gemini-3.6-flash")
         self.system_instruction = system_instruction or DEFAULT_SYSTEM_INSTRUCTION
         self.temperature = temperature
         self._model: Optional[genai.GenerativeModel] = None
@@ -81,7 +89,7 @@ class GeminiProvider:
             self._configure()
 
     def generate(self, prompt: str) -> str:
-        """Generate a one-off completion from Gemini.
+        """Generate a one-off completion from Gemini with multi-model failover.
 
         Args:
             prompt: User text prompt.
@@ -93,24 +101,26 @@ class GeminiProvider:
             raise ValueError(
                 "Gemini API key is not configured. Set GEMINI_API_KEY in your .env file."
             )
-        try:
-            assert self._model is not None
-            response = self._model.generate_content(prompt, request_options={"retry": None})
-            return response.text or ""
-        except Exception as exc:
-            err_str = str(exc).lower()
-            if "429" in err_str or "quota" in err_str:
-                return "Boss, our cloud brain reached the Gemini API free-tier quota limit. Please generate a fresh free API key at https://aistudio.google.com/ and update your .env file, or give me some time to recharge."
-            if "not found" in err_str and self.model_name != "gemini-1.5-flash":
-                self.model_name = "gemini-1.5-flash"
-                self._configure()
+
+        models_to_try = [self.model_name] + [m for m in FALLBACK_MODELS if m != self.model_name]
+        for candidate in models_to_try:
+            try:
+                if candidate != self.model_name or self._model is None:
+                    self.model_name = candidate
+                    self._configure()
                 assert self._model is not None
                 response = self._model.generate_content(prompt, request_options={"retry": None})
                 return response.text or ""
-            return f"I ran into an issue connecting to my cloud brain: {exc}"
+            except Exception as exc:
+                err_str = str(exc).lower()
+                if any(x in err_str for x in ("429", "quota", "not found", "503", "unavailable")):
+                    continue
+                return f"I ran into an issue connecting to my cloud brain: {exc}"
+
+        return "Boss, our cloud brain reached the daily quota across available free-tier Gemini models. Please generate a fresh free API key at https://aistudio.google.com/ and update your .env file, or give me some time to recharge."
 
     def chat(self, user_message: str) -> str:
-        """Send a message within the stateful chat session.
+        """Send a message within the stateful chat session with multi-model failover.
 
         Args:
             user_message: Message from the user.
@@ -122,23 +132,23 @@ class GeminiProvider:
             raise ValueError(
                 "Gemini API key is not configured. Set GEMINI_API_KEY in your .env file."
             )
-        try:
-            if self._chat is None:
-                assert self._model is not None
-                self._chat = self._model.start_chat(history=[])
-            response = self._chat.send_message(user_message, request_options={"retry": None})
-            return response.text or ""
-        except Exception as exc:
-            err_str = str(exc).lower()
-            if "429" in err_str or "quota" in err_str:
-                return "Boss, our cloud brain reached the Gemini API free-tier quota limit. Please generate a fresh free API key at https://aistudio.google.com/ and update your .env file, or give me some time to recharge."
-            if "not found" in err_str and self.model_name != "gemini-1.5-flash":
-                self.model_name = "gemini-1.5-flash"
-                self._configure()
+
+        models_to_try = [self.model_name] + [m for m in FALLBACK_MODELS if m != self.model_name]
+        for candidate in models_to_try:
+            try:
+                if candidate != self.model_name or self._chat is None:
+                    self.model_name = candidate
+                    self._configure()
                 assert self._chat is not None
                 response = self._chat.send_message(user_message, request_options={"retry": None})
                 return response.text or ""
-            return f"I ran into an issue connecting to my cloud brain: {exc}"
+            except Exception as exc:
+                err_str = str(exc).lower()
+                if any(x in err_str for x in ("429", "quota", "not found", "503", "unavailable")):
+                    continue
+                return f"I ran into an issue connecting to my cloud brain: {exc}"
+
+        return "Boss, our cloud brain reached the daily quota across available free-tier Gemini models. Please generate a fresh free API key at https://aistudio.google.com/ and update your .env file, or give me some time to recharge."
 
     def generate_with_image(self, prompt: str, image: Any) -> str:
         """Generate response given a text prompt and an image (path, bytes, or PIL Image).
