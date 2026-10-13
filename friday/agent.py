@@ -18,8 +18,22 @@ from friday.tools.builtin.coding_tools import (
     ReadFileTool,
     WriteFileTool,
 )
+from friday.system.autostart import (
+    DisableAutostartTool,
+    EnableAutostartTool,
+    GetAutostartStatusTool,
+)
+from friday.tools.builtin.datasheet_tools import SearchDatasheetTool
+from friday.tools.builtin.hardware_tools import (
+    ListSerialPortsTool,
+    ReadSerialTelemetryTool,
+)
 from friday.tools.builtin.memory_tools import RecallTool, RememberTool, UpdateCoreMemoryTool
 from friday.tools.builtin.repl_tool import PythonReplTool
+from friday.tools.builtin.signal_lab import (
+    AnalyzeTransferFunctionTool,
+    DesignAnalogFilterTool,
+)
 from friday.tools.builtin.vision_tools import CaptureScreenTool
 from friday.tools.dynamic_manager import CreateSkillTool, DynamicSkillManager
 
@@ -68,6 +82,19 @@ class FridayAgent:
 
         # Register Multimodal Vision tools
         self.register_tool(CaptureScreenTool(gemini_provider=self.llm))
+
+        # Register ENTC Hardware & Signal Suite
+        attachments_dir = str(self.memory.vault.vault_dir / "attachments") if hasattr(self.memory, "vault") else None
+        self.register_tool(AnalyzeTransferFunctionTool(attachments_dir=attachments_dir))
+        self.register_tool(DesignAnalogFilterTool())
+        self.register_tool(ListSerialPortsTool())
+        self.register_tool(ReadSerialTelemetryTool())
+        self.register_tool(SearchDatasheetTool())
+
+        # Register System Autostart tools
+        self.register_tool(EnableAutostartTool())
+        self.register_tool(DisableAutostartTool())
+        self.register_tool(GetAutostartStatusTool())
 
         # Register Jarvis Protocol Dynamic Self-Evolution tools
         self.skill_manager = DynamicSkillManager(

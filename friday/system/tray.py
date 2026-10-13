@@ -15,6 +15,8 @@ load_dotenv()
 
 from PIL import Image, ImageDraw
 
+from friday.proactive.scheduler import FridayScheduler
+from friday.proactive.sentinel import FridaySentinel
 from friday.ui.overlay import HUDOverlay
 from friday.voice.microphone import MicrophoneRecorder
 from friday.voice.tts import FridayTTS
@@ -59,6 +61,9 @@ class FridayTrayDaemon:
         self.tray_icon = None
         self._server_thread: Optional[threading.Thread] = None
         self._hotkey_listener = None
+
+        self.scheduler = FridayScheduler(tts=self.tts)
+        self.sentinel = FridaySentinel()
 
     def start_server_in_background(self) -> None:
         """Start the FastAPI uvicorn server in a daemon thread."""
@@ -178,6 +183,16 @@ class FridayTrayDaemon:
     def exit_app(self, icon=None, item=None) -> None:
         """Clean shutdown of background services, tray icon, and listeners."""
         self.running = False
+        try:
+            self.scheduler.shutdown()
+        except Exception:
+            pass
+
+        try:
+            self.sentinel.stop()
+        except Exception:
+            pass
+
         if self._hotkey_listener:
             try:
                 self._hotkey_listener.stop()
@@ -201,6 +216,13 @@ class FridayTrayDaemon:
         self.running = True
         self.start_server_in_background()
         self.setup_hotkeys()
+
+        # Start proactive scheduler and sentinel
+        try:
+            self.scheduler.start()
+            self.sentinel.start()
+        except Exception as exc:
+            logger.warning(f"Could not start proactive scheduler/sentinel: {exc}")
 
         # Initialize and immediately display HUD window
         self.overlay.create_window()

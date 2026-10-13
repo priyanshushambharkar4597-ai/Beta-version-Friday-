@@ -1,5 +1,10 @@
 """Built-in tools for Friday."""
 
+from friday.system.autostart import (
+    DisableAutostartTool,
+    EnableAutostartTool,
+    GetAutostartStatusTool,
+)
 from friday.tools.builtin.coding_tools import (
     BashExecuteTool,
     PatchFileTool,
@@ -7,12 +12,21 @@ from friday.tools.builtin.coding_tools import (
     ReadFileTool,
     WriteFileTool,
 )
+from friday.tools.builtin.datasheet_tools import SearchDatasheetTool
+from friday.tools.builtin.hardware_tools import (
+    ListSerialPortsTool,
+    ReadSerialTelemetryTool,
+)
 from friday.tools.builtin.memory_tools import (
     RecallTool,
     RememberTool,
     UpdateCoreMemoryTool,
 )
 from friday.tools.builtin.repl_tool import PythonReplTool
+from friday.tools.builtin.signal_lab import (
+    AnalyzeTransferFunctionTool,
+    DesignAnalogFilterTool,
+)
 from friday.tools.builtin.vision_tools import CaptureScreenTool
 
 __all__ = [
@@ -26,4 +40,12 @@ __all__ = [
     "BashExecuteTool",
     "PythonReplTool",
     "CaptureScreenTool",
+    "AnalyzeTransferFunctionTool",
+    "DesignAnalogFilterTool",
+    "ListSerialPortsTool",
+    "ReadSerialTelemetryTool",
+    "SearchDatasheetTool",
+    "EnableAutostartTool",
+    "DisableAutostartTool",
+    "GetAutostartStatusTool",
 ]

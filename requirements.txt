@@ -16,3 +16,7 @@ pywebview>=5.1
 websockets>=12.0
 sounddevice>=0.5.0
 edge-tts>=7.0.0
+scipy>=1.13.0
+matplotlib>=3.8.0
+pyserial>=3.5
+apscheduler>=3.10.0

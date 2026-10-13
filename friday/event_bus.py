@@ -19,6 +19,7 @@ class EventType(str, Enum):
     RESPONSE_GENERATED = "RESPONSE_GENERATED"
     AUDIT_EVENT = "AUDIT_EVENT"
     MEMORY_STORED = "MEMORY_STORED"
+    STATUS_CHANGE = "STATUS_CHANGE"
 
 
 @dataclass
@@ -53,15 +54,21 @@ class SystemEventBus:
 
     def publish(
         self,
-        event_type: EventType,
-        payload: Dict[str, Any],
+        event_type: EventType | SystemEvent,
+        payload: Optional[Dict[str, Any]] = None,
         source: str = "system",
     ) -> SystemEvent:
         """Publish an event synchronously to all registered listeners."""
-        event = SystemEvent(event_type=event_type, payload=payload, source=source)
+        if isinstance(event_type, SystemEvent):
+            event = event_type
+            target_type = event.event_type
+        else:
+            target_type = event_type
+            event = SystemEvent(event_type=target_type, payload=payload or {}, source=source)
+
         self.history.append(event)
 
-        for callback in self.listeners.get(event_type, []):
+        for callback in self.listeners.get(target_type, []):
             try:
                 callback(event)
             except Exception as exc:
