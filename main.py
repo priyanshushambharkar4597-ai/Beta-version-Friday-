@@ -39,6 +39,7 @@ BANNER = r"""
 HELP_TEXT = """
 Available Commands:
   /help         - Show this help message
+  /hud          - Open the interactive Jarvis HUD window
   /clear        - Reset current conversation context
   /tools        - List registered local tools and their safety tiers
   /status       - Show hardware, connection, and memory status
@@ -85,9 +86,33 @@ def prompt_for_api_key() -> str:
 
 
 def main() -> None:
-    """Run Friday's interactive CLI loop."""
+    """Run Friday's interactive CLI or desktop runtime."""
     load_dotenv()
+
+    # Route to desktop Tray/HUD runtime if requested
+    if any(arg in sys.argv for arg in ("--hud", "--tray", "--desktop")):
+        from friday.system.tray import FridayTrayDaemon
+        daemon = FridayTrayDaemon()
+        daemon.run()
+        return
+
     print(BANNER)
+
+    # Start background FastAPI server for HUD & WebSocket telemetry
+    import threading
+    import time
+
+    def _start_bg_server():
+        try:
+            import uvicorn
+            from friday.server import app
+            uvicorn.run(app, host="127.0.0.1", port=8000, log_level="warning")
+        except Exception:
+            pass
+
+    server_thread = threading.Thread(target=_start_bg_server, daemon=True)
+    server_thread.start()
+    time.sleep(0.5)
 
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
@@ -102,7 +127,7 @@ def main() -> None:
     else:
         print("Running in offline stub mode. Cloud Brain requires GEMINI_API_KEY.")
 
-    print("Type your message or '/help' for commands. Type 'exit' to quit.\n")
+    print("Type your message or '/help' for commands. Type '/hud' to open GUI. Type 'exit' to quit.\n")
 
     while True:
         try:
@@ -118,6 +143,13 @@ def main() -> None:
 
             if lower_input == "/help":
                 print(HELP_TEXT)
+                continue
+
+            if lower_input == "/hud":
+                from friday.ui.overlay import HUDOverlay
+                overlay = HUDOverlay()
+                overlay.show()
+                print("Jarvis HUD window launched (http://localhost:8000/hud).\n")
                 continue
 
             if lower_input == "/clear":

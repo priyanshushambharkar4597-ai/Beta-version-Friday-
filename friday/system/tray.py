@@ -91,15 +91,17 @@ class FridayTrayDaemon:
                 if not self.tts_muted:
                     self.tts.speak("Listening, boss.")
 
-            # Register Win+Alt+F (or Ctrl+Shift+F)
+            # Register hotkeys for HUD and Voice
             hotkeys = keyboard.GlobalHotKeys({
                 '<ctrl>+<alt>+f': on_activate_hud,
                 '<ctrl>+<shift>+f': on_activate_hud,
+                '<cmd>+<alt>+f': on_activate_hud,
                 '<ctrl>+<space>': on_activate_voice,
+                '<cmd>+<space>': on_activate_voice,
             })
             hotkeys.start()
             self._hotkey_listener = hotkeys
-            logger.info("Global desktop hotkeys active: Ctrl+Alt+F (HUD), Ctrl+Space (Voice)")
+            logger.info("Global desktop hotkeys active: Ctrl+Alt+F / Win+Alt+F (HUD), Ctrl+Space (Voice)")
         except Exception as exc:
             logger.warning(
                 f"Global hotkey hook could not be registered (fail-soft active): {exc}"
@@ -152,8 +154,19 @@ class FridayTrayDaemon:
         self.start_server_in_background()
         self.setup_hotkeys()
 
-        # Create pywebview window
+        # Initialize and immediately display HUD window
         self.overlay.create_window()
+        try:
+            self.overlay.show()
+        except Exception as exc:
+            logger.warning(f"Could not automatically show HUD: {exc}")
+
+        # Vocalize startup greeting
+        if not self.tts_muted:
+            try:
+                self.tts.speak("Hello Boss. Friday systems are online.")
+            except Exception:
+                pass
 
         # Build tray context menu
         menu = pystray.Menu(

@@ -105,10 +105,6 @@ class HUDOverlay:
 
     def launch_app_window(self) -> None:
         """Launch the HUD as a borderless standalone desktop window."""
-        if hasattr(self, "_app_proc") and self._app_proc and self._app_proc.poll() is None:
-            # Already active
-            return
-
         edge_path = r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
         if sys.platform == "win32" and os.path.exists(edge_path):
             try:
