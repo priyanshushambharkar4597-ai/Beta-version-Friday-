@@ -3,18 +3,24 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Friday - Jarvis HUD</title>
+  <title>FRIDAY MK-II // JARVIS HOLOGRAPHIC HUD</title>
   <style>
     :root {
-      --bg-glass: rgba(10, 16, 28, 0.88);
-      --border-cyan: rgba(0, 240, 255, 0.35);
+      --bg-dark: rgba(6, 11, 20, 0.92);
+      --bg-card: rgba(12, 22, 38, 0.65);
+      --border-cyan: rgba(0, 240, 255, 0.3);
+      --border-cyan-bright: rgba(0, 240, 255, 0.85);
       --cyan-glow: #00f0ff;
-      --cyan-dim: rgba(0, 240, 255, 0.15);
-      --amber-warn: #ffb700;
-      --red-alert: #ff3366;
-      --text-main: #e2f1f8;
-      --text-dim: #7e9bb0;
-      --card-bg: rgba(15, 25, 45, 0.6);
+      --cyan-soft: rgba(0, 240, 255, 0.15);
+      --gold-glow: #ffc048;
+      --gold-soft: rgba(255, 192, 72, 0.2);
+      --amber-warn: #ff9f1a;
+      --purple-accent: #8c7ae6;
+      --red-alert: #ff3838;
+      --green-ok: #2ed573;
+      --text-main: #f1f2f6;
+      --text-dim: #7f8fa6;
+      --font-mono: "Consolas", "Cascadia Code", "Fira Code", monospace;
     }
 
     * {
@@ -29,95 +35,120 @@
       background: transparent;
       color: var(--text-main);
       height: 100vh;
+      width: 100vw;
       overflow: hidden;
       display: flex;
       justify-content: center;
       align-items: center;
-      padding: 12px;
+      padding: 10px;
     }
 
-    .hud-container {
+    /* Main Floating HUD Container */
+    .hud-window {
       width: 100%;
       height: 100%;
-      background: var(--bg-glass);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
+      background: var(--bg-dark);
+      backdrop-filter: blur(28px);
+      -webkit-backdrop-filter: blur(28px);
       border: 1px solid var(--border-cyan);
-      border-radius: 16px;
-      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6), 0 0 25px rgba(0, 240, 255, 0.12);
+      border-radius: 18px;
+      box-shadow: 0 15px 50px rgba(0, 0, 0, 0.75), 0 0 35px rgba(0, 240, 255, 0.18);
       display: flex;
       flex-direction: column;
       position: relative;
+      overflow: hidden;
+    }
+
+    /* Subtle Hex Grid Background */
+    .hud-window::before {
+      content: "";
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-image: 
+        radial-gradient(rgba(0, 240, 255, 0.08) 1px, transparent 1px),
+        radial-gradient(rgba(0, 240, 255, 0.04) 1px, transparent 1px);
+      background-size: 32px 32px;
+      background-position: 0 0, 16px 16px;
+      pointer-events: none;
+      z-index: 0;
+      opacity: 0.7;
     }
 
     /* Top HUD Header */
-    .hud-header {
-      padding: 14px 20px;
-      border-bottom: 1px solid rgba(0, 240, 255, 0.15);
+    .hud-topbar {
+      height: 52px;
+      padding: 0 20px;
+      border-bottom: 1px solid rgba(0, 240, 255, 0.16);
       display: flex;
       justify-content: space-between;
       align-items: center;
-      background: rgba(5, 10, 20, 0.3);
+      background: rgba(4, 8, 16, 0.5);
+      position: relative;
+      z-index: 10;
     }
 
-    .brand-section {
+    .top-left {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 14px;
     }
 
-    .reactor-core {
-      width: 24px;
-      height: 24px;
-      border-radius: 50%;
-      border: 2px solid var(--cyan-glow);
-      box-shadow: 0 0 12px var(--cyan-glow);
-      position: relative;
-      animation: pulse 2.5s infinite ease-in-out;
-    }
-
-    .reactor-core::after {
-      content: '';
-      position: absolute;
-      top: 5px;
-      left: 5px;
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      background: var(--cyan-glow);
-      box-shadow: 0 0 8px #fff;
-    }
-
-    @keyframes pulse {
-      0%, 100% { transform: scale(1); opacity: 0.85; filter: drop-shadow(0 0 4px var(--cyan-glow)); }
-      50% { transform: scale(1.12); opacity: 1; filter: drop-shadow(0 0 12px var(--cyan-glow)); }
-    }
-
-    .title-group h1 {
-      font-size: 16px;
-      letter-spacing: 2.5px;
-      color: #fff;
+    .hud-state-pill {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(0, 240, 255, 0.08);
+      border: 1px solid var(--border-cyan);
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 11px;
+      letter-spacing: 1.5px;
       text-transform: uppercase;
       font-weight: 700;
+      transition: all 0.3s ease;
     }
 
-    .title-group span {
-      font-size: 11px;
-      color: var(--cyan-glow);
-      letter-spacing: 1px;
+    .state-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--cyan-glow);
+      box-shadow: 0 0 10px var(--cyan-glow);
+      transition: all 0.3s ease;
     }
 
-    .hud-telemetry {
+    .top-center-brand {
       display: flex;
-      gap: 10px;
       align-items: center;
+      gap: 8px;
     }
 
-    .badge {
-      background: var(--card-bg);
-      border: 1px solid rgba(0, 240, 255, 0.2);
+    .brand-title {
+      font-size: 15px;
+      letter-spacing: 3px;
+      font-weight: 800;
+      color: #fff;
+      text-transform: uppercase;
+    }
+
+    .brand-sub {
+      font-size: 10.5px;
+      color: var(--cyan-glow);
+      letter-spacing: 1.5px;
+      font-weight: 600;
+    }
+
+    .top-right-telemetry {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .hud-badge {
+      background: var(--bg-card);
+      border: 1px solid rgba(0, 240, 255, 0.18);
       padding: 4px 10px;
-      border-radius: 20px;
+      border-radius: 8px;
       font-size: 11px;
       color: var(--text-dim);
       display: flex;
@@ -125,48 +156,200 @@
       gap: 6px;
     }
 
-    .badge-value {
+    .hud-badge .val {
       color: var(--cyan-glow);
       font-weight: 600;
+      font-family: var(--font-mono);
     }
 
-    .close-btn {
-      background: none;
-      border: none;
+    .sfx-toggle {
+      background: rgba(0, 240, 255, 0.08);
+      border: 1px solid rgba(0, 240, 255, 0.25);
       color: var(--text-dim);
-      font-size: 18px;
+      padding: 4px 10px;
+      border-radius: 8px;
+      font-size: 11px;
       cursor: pointer;
-      padding: 4px 8px;
-      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
       transition: all 0.2s;
     }
 
-    .close-btn:hover {
+    .sfx-toggle:hover {
+      background: rgba(0, 240, 255, 0.2);
       color: #fff;
-      background: rgba(255, 255, 255, 0.1);
     }
 
-    /* Waveform Bar */
-    .waveform-bar {
-      height: 36px;
-      background: rgba(0, 240, 255, 0.03);
-      border-bottom: 1px solid rgba(0, 240, 255, 0.08);
+    .sfx-toggle.active {
+      color: var(--cyan-glow);
+      border-color: var(--cyan-glow);
+      box-shadow: 0 0 8px rgba(0, 240, 255, 0.3);
+    }
+
+    .win-close-btn {
+      background: none;
+      border: 1px solid transparent;
+      color: var(--text-dim);
+      font-size: 15px;
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
-      padding: 0 20px;
+      transition: all 0.2s;
     }
 
-    canvas#waveformCanvas {
+    .win-close-btn:hover {
+      background: rgba(255, 56, 56, 0.2);
+      border-color: var(--red-alert);
+      color: #fff;
+    }
+
+    /* Main HUD Workspace Split */
+    .hud-workspace {
+      flex: 1;
+      display: flex;
+      position: relative;
+      z-index: 1;
+      overflow: hidden;
+    }
+
+    /* Central Arc Reactor Visualizer Area */
+    .reactor-stage {
+      flex: 1.3;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      overflow: hidden;
+    }
+
+    #reactorCanvas {
       width: 100%;
-      height: 28px;
+      height: 100%;
+      position: absolute;
+      top: 0; left: 0;
     }
 
-    /* Main Log & Activity Feed */
-    .activity-feed {
+    /* Floating Reactor Center HUD Label */
+    .reactor-center-info {
+      position: relative;
+      z-index: 2;
+      text-align: center;
+      pointer-events: none;
+      margin-top: 190px;
+    }
+
+    .reactor-core-status {
+      font-size: 12px;
+      letter-spacing: 2.5px;
+      font-weight: 700;
+      color: var(--cyan-glow);
+      text-shadow: 0 0 10px var(--cyan-glow);
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+
+    .reactor-core-sub {
+      font-size: 10.5px;
+      letter-spacing: 1px;
+      color: var(--text-dim);
+      font-family: var(--font-mono);
+    }
+
+    /* Quick Action Chips */
+    .quick-chips {
+      position: absolute;
+      bottom: 12px;
+      display: flex;
+      gap: 8px;
+      z-index: 5;
+    }
+
+    .chip-btn {
+      background: rgba(8, 16, 30, 0.7);
+      border: 1px solid rgba(0, 240, 255, 0.2);
+      color: var(--text-dim);
+      padding: 5px 12px;
+      border-radius: 14px;
+      font-size: 11px;
+      cursor: pointer;
+      backdrop-filter: blur(10px);
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .chip-btn:hover {
+      background: rgba(0, 240, 255, 0.15);
+      border-color: var(--cyan-glow);
+      color: #fff;
+      transform: translateY(-2px);
+      box-shadow: 0 0 12px rgba(0, 240, 255, 0.25);
+    }
+
+    /* Right Telemetry Terminal & Activity Stream */
+    .telemetry-pane {
+      flex: 1.1;
+      border-left: 1px solid rgba(0, 240, 255, 0.16);
+      background: rgba(8, 14, 26, 0.55);
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      z-index: 2;
+    }
+
+    .telemetry-header {
+      padding: 10px 18px;
+      border-bottom: 1px solid rgba(0, 240, 255, 0.1);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(5, 10, 20, 0.4);
+    }
+
+    .telemetry-title {
+      font-size: 11px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--cyan-glow);
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .telemetry-title::before {
+      content: "";
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--cyan-glow);
+      box-shadow: 0 0 6px var(--cyan-glow);
+    }
+
+    .clear-feed-btn {
+      background: none;
+      border: none;
+      color: var(--text-dim);
+      font-size: 11px;
+      cursor: pointer;
+      letter-spacing: 1px;
+    }
+
+    .clear-feed-btn:hover {
+      color: #fff;
+    }
+
+    .activity-stream {
       flex: 1;
       overflow-y: auto;
-      padding: 16px 20px;
+      padding: 14px 18px;
       display: flex;
       flex-direction: column;
       gap: 12px;
@@ -174,274 +357,793 @@
       scrollbar-color: var(--border-cyan) transparent;
     }
 
-    .feed-item {
-      background: var(--card-bg);
-      border: 1px solid rgba(0, 240, 255, 0.1);
+    .stream-card {
+      background: var(--bg-card);
+      border: 1px solid rgba(0, 240, 255, 0.12);
       border-radius: 10px;
-      padding: 12px 16px;
-      font-size: 13.5px;
+      padding: 11px 14px;
+      font-size: 13px;
       line-height: 1.5;
-      animation: fadeIn 0.3s ease;
+      animation: cardSlide 0.25s ease-out;
+      position: relative;
     }
 
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(6px); }
+    @keyframes cardSlide {
+      from { opacity: 0; transform: translateY(8px); }
       to { opacity: 1; transform: translateY(0); }
     }
 
-    .feed-item.user {
+    .stream-card.user {
       border-left: 3px solid var(--cyan-glow);
       background: rgba(0, 240, 255, 0.04);
     }
 
-    .feed-item.friday {
-      border-left: 3px solid #6c5ce7;
-      background: rgba(108, 92, 231, 0.06);
+    .stream-card.friday {
+      border-left: 3px solid var(--purple-accent);
+      background: rgba(140, 122, 230, 0.06);
     }
 
-    .feed-item.tool {
+    .stream-card.tool {
       border-left: 3px solid var(--amber-warn);
-      background: rgba(255, 183, 0, 0.05);
-      font-family: Consolas, monospace;
-      font-size: 12px;
+      background: rgba(255, 159, 26, 0.05);
+      font-family: var(--font-mono);
+      font-size: 11.5px;
     }
 
-    .feed-header {
-      font-size: 11px;
+    .card-meta {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 6px;
+      font-size: 10.5px;
       text-transform: uppercase;
-      letter-spacing: 1px;
-      margin-bottom: 4px;
+      letter-spacing: 1.2px;
+      font-weight: 700;
       color: var(--cyan-glow);
-      font-weight: 600;
     }
 
-    /* Security Authorization Banner */
-    .security-modal {
+    .card-meta.friday-meta {
+      color: var(--purple-accent);
+    }
+
+    .card-meta.tool-meta {
+      color: var(--amber-warn);
+    }
+
+    .telemetry-img {
+      max-width: 100%;
+      border-radius: 8px;
+      border: 1px solid var(--border-cyan);
+      margin-top: 10px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+    }
+
+    .telemetry-img:hover {
+      border-color: var(--cyan-glow);
+      box-shadow: 0 0 18px rgba(0, 240, 255, 0.4);
+      transform: scale(1.015);
+    }
+
+    /* Security Modal Alert */
+    .security-modal-bar {
       display: none;
-      background: rgba(25, 12, 18, 0.95);
+      background: rgba(30, 10, 18, 0.95);
       border: 1px solid var(--red-alert);
-      box-shadow: 0 0 20px rgba(255, 51, 102, 0.3);
-      padding: 14px 18px;
+      box-shadow: 0 0 25px rgba(255, 56, 56, 0.35);
+      padding: 12px 18px;
       border-radius: 10px;
-      margin: 10px 20px;
+      margin: 10px 18px;
       align-items: center;
       justify-content: space-between;
       gap: 12px;
+      z-index: 10;
     }
 
-    .security-info {
+    .sec-desc {
       font-size: 12px;
     }
 
-    .security-info strong {
+    .sec-desc strong {
       color: var(--red-alert);
-      text-transform: uppercase;
-      font-size: 13px;
+      letter-spacing: 1px;
     }
 
-    .security-actions {
+    .sec-btn-group {
       display: flex;
-      gap: 10px;
+      gap: 8px;
     }
 
-    .btn {
+    .sec-btn {
       padding: 6px 14px;
       border-radius: 6px;
-      font-size: 12px;
-      font-weight: 600;
+      font-size: 11.5px;
+      font-weight: 700;
       cursor: pointer;
       border: none;
       transition: all 0.2s;
     }
 
-    .btn-approve {
-      background: #00b894;
-      color: #fff;
-    }
-
-    .btn-approve:hover {
-      background: #55efc4;
+    .sec-btn.allow {
+      background: var(--green-ok);
       color: #000;
     }
 
-    .btn-decline {
-      background: #d63031;
+    .sec-btn.allow:hover {
+      box-shadow: 0 0 12px var(--green-ok);
+    }
+
+    .sec-btn.deny {
+      background: var(--red-alert);
       color: #fff;
     }
 
-    .btn-decline:hover {
-      background: #ff7675;
+    .sec-btn.deny:hover {
+      box-shadow: 0 0 12px var(--red-alert);
     }
 
-    /* Bottom Prompt Input */
-    .hud-input-bar {
+    /* Bottom Interactive Command Dock */
+    .hud-dock {
       padding: 12px 20px 16px;
-      border-top: 1px solid rgba(0, 240, 255, 0.12);
+      border-top: 1px solid rgba(0, 240, 255, 0.16);
+      background: rgba(4, 8, 16, 0.65);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      position: relative;
+      z-index: 10;
+    }
+
+    .dock-main {
       display: flex;
       gap: 10px;
-      background: rgba(5, 10, 20, 0.4);
-      border-radius: 0 0 16px 16px;
+      align-items: center;
     }
 
-    .prompt-input {
+    .prompt-box {
       flex: 1;
-      background: rgba(15, 25, 45, 0.8);
+      background: rgba(12, 22, 40, 0.85);
       border: 1px solid rgba(0, 240, 255, 0.25);
       border-radius: 10px;
-      padding: 10px 16px;
+      padding: 11px 16px;
       color: #fff;
-      font-size: 14px;
+      font-size: 13.5px;
       outline: none;
       transition: all 0.25s;
     }
 
-    .prompt-input:focus {
+    .prompt-box:focus {
       border-color: var(--cyan-glow);
-      box-shadow: 0 0 12px rgba(0, 240, 255, 0.25);
-      background: rgba(15, 25, 45, 0.95);
+      box-shadow: 0 0 15px rgba(0, 240, 255, 0.28);
+      background: rgba(14, 26, 48, 0.95);
     }
 
-    .action-btn {
-      background: linear-gradient(135deg, rgba(0, 240, 255, 0.2), rgba(0, 180, 255, 0.4));
-      border: 1px solid var(--cyan-glow);
-      color: #fff;
-      border-radius: 10px;
+    .dock-btn {
       padding: 0 18px;
-      font-size: 13px;
-      font-weight: 600;
+      height: 42px;
+      border-radius: 10px;
+      font-size: 12.5px;
+      font-weight: 700;
+      letter-spacing: 1px;
       cursor: pointer;
       display: flex;
       align-items: center;
-      gap: 6px;
-      transition: all 0.2s;
+      gap: 7px;
+      transition: all 0.2s ease;
+      border: 1px solid transparent;
     }
 
-    .action-btn:hover {
+    .voice-btn {
+      background: rgba(0, 240, 255, 0.12);
+      border-color: var(--border-cyan);
+      color: var(--cyan-glow);
+    }
+
+    .voice-btn:hover {
+      background: rgba(0, 240, 255, 0.25);
+      border-color: var(--cyan-glow);
+      box-shadow: 0 0 15px rgba(0, 240, 255, 0.35);
+      color: #fff;
+    }
+
+    .voice-btn.recording {
+      background: rgba(255, 56, 56, 0.25);
+      border-color: var(--red-alert);
+      color: #fff;
+      box-shadow: 0 0 20px rgba(255, 56, 56, 0.5);
+      animation: pulseRecord 1.2s infinite ease-in-out;
+    }
+
+    @keyframes pulseRecord {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.04); }
+    }
+
+    .send-btn {
+      background: linear-gradient(135deg, rgba(0, 240, 255, 0.3), rgba(0, 180, 255, 0.6));
+      border-color: var(--cyan-glow);
+      color: #fff;
+    }
+
+    .send-btn:hover {
       background: var(--cyan-glow);
       color: #000;
-      box-shadow: 0 0 15px var(--cyan-glow);
+      box-shadow: 0 0 18px var(--cyan-glow);
+    }
+
+    .dock-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 10.5px;
+      color: var(--text-dim);
+      padding: 0 4px;
+    }
+
+    .shortcut-hint {
+      font-family: var(--font-mono);
+      letter-spacing: 0.5px;
+    }
+
+    .shortcut-hint kbd {
+      background: rgba(0, 240, 255, 0.08);
+      border: 1px solid rgba(0, 240, 255, 0.2);
+      border-radius: 4px;
+      padding: 2px 6px;
+      color: var(--cyan-glow);
+      margin: 0 2px;
     }
   </style>
 </head>
 <body>
-  <div class="hud-container">
-    <!-- Top Header -->
-    <div class="hud-header">
-      <div class="brand-section">
-        <div class="reactor-core" id="reactorCore"></div>
-        <div class="title-group">
-          <h1>FRIDAY</h1>
-          <span id="statusSub">SYSTEM NOMINAL // STANDBY</span>
+  <div class="hud-window">
+    <!-- Top HUD Bar -->
+    <div class="hud-topbar">
+      <div class="top-left">
+        <div class="hud-state-pill" id="hudStatePill">
+          <div class="state-dot" id="stateDot"></div>
+          <span id="hudStateText">STANDBY</span>
         </div>
       </div>
-      <div class="hud-telemetry">
-        <div class="badge">Brain: <span class="badge-value" id="brainModel">gemini-3.8-flash</span></div>
-        <div class="badge">GPU Policy: <span class="badge-value">0% ML</span></div>
-        <div class="badge">Vault: <span class="badge-value" id="vaultCount">--</span></div>
-        <button class="close-btn" onclick="closeHUD()" title="Minimize (Esc)">✕</button>
+
+      <div class="top-center-brand">
+        <div class="brand-title">FRIDAY MK-II</div>
+        <div class="brand-sub">// SOTA QUANTUM SENTINEL</div>
+      </div>
+
+      <div class="top-right-telemetry">
+        <div class="hud-badge">Brain: <span class="val" id="telemetryBrain">Gemini-Flash-Lite</span></div>
+        <div class="hud-badge">GPU: <span class="val">0.0% ML</span></div>
+        <div class="hud-badge">Vault: <span class="val" id="telemetryVault">--</span></div>
+        <button class="sfx-toggle active" id="sfxToggleBtn" onclick="toggleSFX()" title="Tactile Sci-Fi Audio Effects">🔊 SFX</button>
+        <button class="win-close-btn" onclick="closeHUD()" title="Minimize HUD (Esc)">✕</button>
       </div>
     </div>
 
-    <!-- Audio Waveform Visualizer -->
-    <div class="waveform-bar">
-      <canvas id="waveformCanvas"></canvas>
-    </div>
-
-    <!-- Security Gate Banner -->
-    <div class="security-modal" id="securityModal">
-      <div class="security-info">
-        <strong>⚠️ IRREVERSIBLE ACTION DETECTED</strong>
-        <div id="securityDesc">Command: rm -rf /</div>
+    <!-- Security Authorization Alert -->
+    <div class="security-modal-bar" id="securityModal">
+      <div class="sec-desc">
+        <strong>⚠️ IRREVERSIBLE ACTION AUTHORIZATION REQUIRED</strong>
+        <div id="securityDesc">Execution requires explicit user confirmation.</div>
       </div>
-      <div class="security-actions">
-        <button class="btn btn-approve" onclick="resolveSecurity(true)">Authorize [Y]</button>
-        <button class="btn btn-decline" onclick="resolveSecurity(false)">Decline [N]</button>
+      <div class="sec-btn-group">
+        <button class="sec-btn allow" onclick="resolveSecurity(true)">AUTHORIZE [Y]</button>
+        <button class="sec-btn deny" onclick="resolveSecurity(false)">DECLINE [N]</button>
       </div>
     </div>
 
-    <!-- Activity Stream -->
-    <div class="activity-feed" id="activityFeed">
-      <div class="feed-item friday">
-        <div class="feed-header">FRIDAY SYSTEM</div>
-        Jarvis Ambient HUD initialized. Press <strong>Win + Alt + F</strong> anytime to toggle, or <strong>Win + Space</strong> to voice command.
+    <!-- Main Workspace Split -->
+    <div class="hud-workspace">
+      <!-- Stage: 3D Holographic Arc Reactor Canvas -->
+      <div class="reactor-stage">
+        <canvas id="reactorCanvas"></canvas>
+        <canvas id="waveformCanvas" style="display:none;"></canvas>
+        <div class="reactor-center-info">
+          <div class="reactor-core-status" id="reactorStateLabel">IDLE // BREATHING</div>
+          <div class="reactor-core-sub" id="reactorSubLabel">CPU IN-PROCESS MCI ENGINE ACTIVE</div>
+        </div>
+
+        <!-- Capability Chips -->
+        <div class="quick-chips">
+          <button class="chip-btn" onclick="runQuickAction('Analyze transfer function with numerator [10000] and denominator [1, 141.4, 10000]')">📊 Bode Plot</button>
+          <button class="chip-btn" onclick="runQuickAction('What projects are in your core memory?')">🧠 Core Memory</button>
+          <button class="chip-btn" onclick="runQuickAction('Capture my active desktop screen and describe what is in focus')">📸 Vision Grounding</button>
+          <button class="chip-btn" onclick="runQuickAction('Backup current obsidian vault snapshot')">💾 Backup Vault</button>
+        </div>
+      </div>
+
+      <!-- Right: Translucent Telemetry Stream -->
+      <div class="telemetry-pane">
+        <div class="telemetry-header">
+          <div class="telemetry-title">LIVE TELEMETRY STREAM</div>
+          <button class="clear-feed-btn" onclick="clearFeed()">CLEAR</button>
+        </div>
+        <div class="activity-stream" id="activityStream">
+          <div class="stream-card friday">
+            <div class="card-meta friday-meta">FRIDAY SYSTEM MK-II</div>
+            <div>Jarvis Ambient HUD initialized. Press <kbd>Ctrl + Space</kbd> to speak aloud or <kbd>Ctrl + Alt + F</kbd> to summon this overlay anytime.</div>
+          </div>
+        </div>
       </div>
     </div>
 
-    <!-- Bottom Command Input -->
-    <div class="hud-input-bar">
-      <input 
-        type="text" 
-        class="prompt-input" 
-        id="promptInput" 
-        placeholder="Ask Friday, instruct a task, or query memory... (Press Enter to Send)" 
-        autofocus 
-        onkeydown="handleKey(event)"
-      />
-      <button class="action-btn" id="voiceBtn" onclick="toggleVoice()" title="Push-to-Talk Voice Command (Ctrl+Space)" style="background: rgba(0, 240, 255, 0.15);">🎙️ VOICE</button>
-      <button class="action-btn" onclick="sendPrompt()">SEND</button>
+    <!-- Bottom Command Dock -->
+    <div class="hud-dock">
+      <div class="dock-main">
+        <input 
+          type="text" 
+          class="prompt-box" 
+          id="promptBox" 
+          placeholder="Instruct Friday, run calculations, or query memory... (Press Enter to execute)" 
+          autofocus 
+          onkeydown="handleKey(event)"
+        />
+        <button class="dock-btn voice-btn" id="voiceBtn" onclick="toggleVoice()" title="Push-to-Talk Spoken Command">
+          🎙️ <span id="voiceBtnText">VOICE</span>
+        </button>
+        <button class="dock-btn send-btn" onclick="sendPrompt()">SEND</button>
+      </div>
+      <div class="dock-footer">
+        <div class="shortcut-hint">
+          Shortcuts: <kbd>Ctrl + Space</kbd> Voice • <kbd>Ctrl + Alt + F</kbd> Toggle HUD • <kbd>Esc</kbd> Minimize
+        </div>
+        <div>Irish Neural Voice (Emily) • Low Latency &lt; 50ms Earcons</div>
+      </div>
     </div>
   </div>
 
   <script>
+    /* =====================================================================
+       WEB AUDIO API SCI-FI SOUND EFFECTS GENERATOR
+       ===================================================================== */
+    let audioCtx = null;
+    let sfxEnabled = true;
+
+    function getAudioContext() {
+      if (!audioCtx) {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        audioCtx = new AudioContextClass();
+      }
+      if (audioCtx.state === "suspended") {
+        audioCtx.resume();
+      }
+      return audioCtx;
+    }
+
+    function toggleSFX() {
+      sfxEnabled = !sfxEnabled;
+      const btn = document.getElementById("sfxToggleBtn");
+      if (sfxEnabled) {
+        btn.classList.add("active");
+        btn.innerText = "🔊 SFX";
+        playSciFiChime("ack");
+      } else {
+        btn.classList.remove("active");
+        btn.innerText = "🔇 SFX";
+      }
+    }
+
+    function playSciFiChime(type = "ack") {
+      if (!sfxEnabled) return;
+      try {
+        const ctx = getAudioContext();
+        const now = ctx.currentTime;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+        if (type === "click") {
+          osc.type = "sine";
+          osc.frequency.setValueAtTime(1200, now);
+          osc.frequency.exponentialRampToValueAtTime(600, now + 0.04);
+          gain.gain.setValueAtTime(0.08, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+          osc.start(now);
+          osc.stop(now + 0.045);
+        } else if (type === "ack") {
+          osc.type = "triangle";
+          osc.frequency.setValueAtTime(587.33, now); // D5
+          osc.frequency.setValueAtTime(880.0, now + 0.05); // A5
+          gain.gain.setValueAtTime(0.12, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+          osc.start(now);
+          osc.stop(now + 0.16);
+        } else if (type === "speaking") {
+          osc.type = "sine";
+          osc.frequency.setValueAtTime(440, now);
+          osc.frequency.exponentialRampToValueAtTime(880, now + 0.08);
+          gain.gain.setValueAtTime(0.08, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+          osc.start(now);
+          osc.stop(now + 0.13);
+        } else if (type === "alert") {
+          osc.type = "sawtooth";
+          osc.frequency.setValueAtTime(400, now);
+          osc.frequency.linearRampToValueAtTime(300, now + 0.15);
+          gain.gain.setValueAtTime(0.15, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+          osc.start(now);
+          osc.stop(now + 0.17);
+        }
+      } catch (e) {
+        // Fail-soft if user hasn't interacted with DOM yet
+      }
+    }
+
+    // Attach click SFX to buttons
+    document.querySelectorAll("button").forEach(b => {
+      b.addEventListener("click", () => playSciFiChime("click"));
+    });
+
+    /* =====================================================================
+       HUD STATE MACHINE: IDLE | LISTENING | THINKING | SPEAKING
+       ===================================================================== */
+    const HUD_STATES = {
+      IDLE: { label: "STANDBY", color: "#00f0ff", core: "IDLE // BREATHING", sub: "CPU IN-PROCESS MCI ENGINE ACTIVE" },
+      LISTENING: { label: "LISTENING", color: "#ff3838", core: "LISTENING // CAPTURING SPEECH", sub: "16kHz DIRECT PCM AUDIO STREAM" },
+      THINKING: { label: "ANALYZING", color: "#ff9f1a", core: "THINKING // CLOUD BRAIN ACTIVE", sub: "GEMINI REASONING & TOOL SYNTHESIS" },
+      SPEAKING: { label: "VOCALIZING", color: "#8c7ae6", core: "SPEAKING // STREAMING TTS", sub: "MICROSOFT EDGE IRISH NEURAL VOICE" }
+    };
+
+    let currentState = "IDLE";
+    let stateTransitionTime = Date.now();
+
+    function setHudState(stateKey) {
+      if (!HUD_STATES[stateKey] || currentState === stateKey) return;
+      currentState = stateKey;
+      stateTransitionTime = Date.now();
+
+      const stateCfg = HUD_STATES[stateKey];
+      document.getElementById("hudStateText").innerText = stateCfg.label;
+      document.getElementById("stateDot").style.background = stateCfg.color;
+      document.getElementById("stateDot").style.boxShadow = `0 0 10px ${stateCfg.color}`;
+      document.getElementById("reactorStateLabel").innerText = stateCfg.core;
+      document.getElementById("reactorStateLabel").style.color = stateCfg.color;
+      document.getElementById("reactorStateLabel").style.textShadow = `0 0 12px ${stateCfg.color}`;
+      document.getElementById("reactorSubLabel").innerText = stateCfg.sub;
+
+      if (stateKey === "SPEAKING") playSciFiChime("speaking");
+      else if (stateKey === "LISTENING") playSciFiChime("ack");
+    }
+
+    /* =====================================================================
+       3D PARTICLE ARC REACTOR CANVAS ENGINE
+       ===================================================================== */
+    const canvas = document.getElementById("reactorCanvas");
+    const ctx = canvas.getContext("2d");
+
+    // Particle pool for ambient drift and vortex
+    const NUM_PARTICLES = 160;
+    const particles = [];
+    let canvasW = 0, canvasH = 0, centerX = 0, centerY = 0;
+
+    function resizeCanvas() {
+      const rect = canvas.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      canvasW = rect.width;
+      canvasH = rect.height;
+      canvas.width = canvasW * dpr;
+      canvas.height = canvasH * dpr;
+      ctx.scale(dpr, dpr);
+      centerX = canvasW / 2;
+      centerY = canvasH / 2 - 25;
+    }
+
+    for (let i = 0; i < NUM_PARTICLES; i++) {
+      particles.push({
+        angle: Math.random() * Math.PI * 2,
+        dist: 40 + Math.random() * 150,
+        speed: 0.005 + Math.random() * 0.015,
+        radius: 1.0 + Math.random() * 2.0,
+        alpha: 0.2 + Math.random() * 0.8,
+        colorType: Math.random() > 0.3 ? "cyan" : "gold"
+      });
+    }
+
+    let globalRotation = 0;
+
+    function renderArcReactor() {
+      ctx.clearRect(0, 0, canvasW, canvasH);
+
+      const time = Date.now() * 0.001;
+      let rotSpeed = 0.008;
+      let pulseAmp = 1.0;
+      let energyIntensity = 1.0;
+
+      if (currentState === "THINKING") {
+        rotSpeed = 0.045; // Accelerate vortex
+        energyIntensity = 1.8;
+      } else if (currentState === "SPEAKING") {
+        rotSpeed = 0.015;
+        pulseAmp = 1.0 + Math.sin(time * 12) * 0.18; // Soundwave pulse
+      } else if (currentState === "LISTENING") {
+        rotSpeed = 0.012;
+        pulseAmp = 1.0 + Math.sin(time * 8) * 0.12;
+      }
+
+      globalRotation += rotSpeed;
+
+      // 1. Central Core Bloom
+      const coreRadius = (32 + Math.sin(time * 3) * 4) * pulseAmp;
+      const gradCore = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, coreRadius * 2.2);
+      
+      let coreColorCenter = "rgba(0, 240, 255, 0.95)";
+      let coreColorOuter = "rgba(0, 240, 255, 0.0)";
+      if (currentState === "THINKING") {
+        coreColorCenter = "rgba(255, 159, 26, 0.95)";
+      } else if (currentState === "LISTENING") {
+        coreColorCenter = "rgba(255, 56, 56, 0.9)";
+      } else if (currentState === "SPEAKING") {
+        coreColorCenter = "rgba(140, 122, 230, 0.95)";
+      }
+
+      gradCore.addColorStop(0, coreColorCenter);
+      gradCore.addColorStop(0.4, coreColorCenter.replace("0.9", "0.35").replace("0.95", "0.35"));
+      gradCore.addColorStop(1, coreColorOuter);
+
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, coreRadius * 2.2, 0, Math.PI * 2);
+      ctx.fillStyle = gradCore;
+      ctx.fill();
+
+      // Core Solid Center
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, 14 * pulseAmp, 0, Math.PI * 2);
+      ctx.fillStyle = "#fff";
+      ctx.shadowColor = coreColorCenter;
+      ctx.shadowBlur = 18 * energyIntensity;
+      ctx.fill();
+      ctx.shadowBlur = 0; // reset
+
+      // 2. Concentric Holographic Arc Rings
+      const rings = [
+        { r: 52 * pulseAmp, width: 2.0, speed: 1.0, dash: [18, 10], color: "rgba(0, 240, 255, 0.7)" },
+        { r: 84 * pulseAmp, width: 1.5, speed: -0.7, dash: [40, 15, 10, 15], color: "rgba(0, 240, 255, 0.55)" },
+        { r: 122 * pulseAmp, width: 2.2, speed: 0.5, dash: [8, 8], color: "rgba(255, 192, 72, 0.5)" },
+        { r: 158 * pulseAmp, width: 1.2, speed: -0.3, dash: [80, 25], color: "rgba(0, 240, 255, 0.4)" }
+      ];
+
+      rings.forEach(ring => {
+        ctx.save();
+        ctx.translate(centerX, centerY);
+        ctx.rotate(globalRotation * ring.speed);
+        ctx.beginPath();
+        ctx.arc(0, 0, ring.r, 0, Math.PI * 2);
+        ctx.strokeStyle = currentState === "THINKING" ? "rgba(255, 159, 26, 0.6)" : ring.color;
+        ctx.lineWidth = ring.width;
+        ctx.setLineDash(ring.dash);
+        ctx.stroke();
+        ctx.restore();
+      });
+
+      // 3. Acoustic Frequency Spikes (LISTENING or SPEAKING)
+      if (currentState === "SPEAKING" || currentState === "LISTENING") {
+        const numSpikes = 64;
+        const baseR = 135 * pulseAmp;
+        ctx.save();
+        ctx.translate(centerX, centerY);
+        ctx.strokeStyle = currentState === "SPEAKING" ? "rgba(140, 122, 230, 0.85)" : "rgba(255, 56, 56, 0.85)";
+        ctx.lineWidth = 1.8;
+
+        for (let i = 0; i < numSpikes; i++) {
+          const ang = (i / numSpikes) * Math.PI * 2 + globalRotation;
+          const amp = Math.sin(i * 3 + time * 14) * 16 * pulseAmp;
+          const r1 = baseR;
+          const r2 = baseR + Math.max(3, Math.abs(amp));
+
+          ctx.beginPath();
+          ctx.moveTo(Math.cos(ang) * r1, Math.sin(ang) * r1);
+          ctx.lineTo(Math.cos(ang) * r2, Math.sin(ang) * r2);
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+
+      // 4. Swirling / Orbiting Particles
+      particles.forEach(p => {
+        p.angle += p.speed * (currentState === "THINKING" ? 2.5 : 1.0);
+
+        // Gentle breathing distance
+        let dist = p.dist * pulseAmp;
+        if (currentState === "THINKING") {
+          dist = (dist * 0.98); // pull into vortex
+          if (dist < 20) dist = 160;
+        }
+
+        const px = centerX + Math.cos(p.angle) * dist;
+        const py = centerY + Math.sin(p.angle) * dist;
+
+        ctx.beginPath();
+        ctx.arc(px, py, p.radius, 0, Math.PI * 2);
+        const col = p.colorType === "cyan" 
+          ? `rgba(0, 240, 255, ${p.alpha})`
+          : `rgba(255, 192, 72, ${p.alpha})`;
+        ctx.fillStyle = col;
+        ctx.shadowColor = col;
+        ctx.shadowBlur = 6;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+      });
+
+      requestAnimationFrame(renderArcReactor);
+    }
+
+    window.addEventListener("resize", resizeCanvas);
+
+    /* =====================================================================
+       WEBSOCKET HUD TELEMETRY CLIENT
+       ===================================================================== */
     let ws = null;
-    let isSpeaking = false;
-    let currentPendingAction = null;
+    let pendingSecurityAction = null;
     let mediaRecorder = null;
     let audioChunks = [];
     let isRecordingAudio = false;
 
-    // Connect WebSocket
     function connectWS() {
       const loc = window.location;
       const wsUrl = `ws://${loc.host}/api/ws`;
       ws = new WebSocket(wsUrl);
 
       ws.onopen = () => {
-        document.getElementById("statusSub").innerText = "CONNECTED // REALTIME TELEMETRY";
+        document.getElementById("reactorSubLabel").innerText = "CONNECTED // REALTIME TELEMETRY ACTIVE";
         fetchStatus();
       };
 
       ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          handleTelemetry(data);
+          handleWebSocketMessage(data);
         } catch (e) {
           console.error("WS Parse error", e);
         }
       };
 
       ws.onclose = () => {
-        document.getElementById("statusSub").innerText = "DISCONNECTED // RECONNECTING...";
+        document.getElementById("reactorSubLabel").innerText = "DISCONNECTED // RECONNECTING...";
         setTimeout(connectWS, 2000);
       };
     }
 
-    function handleTelemetry(data) {
+    function handleWebSocketMessage(data) {
       if (data.type === "TELEMETRY_EVENT") {
         const payload = data.event.payload || {};
         const eventType = data.event.event_type;
 
         if (eventType === "VOICE_INPUT") {
-          addFeedItem("VOICE INPUT", "Listening to microphone...", "user");
-          document.getElementById("statusSub").innerText = "VOICE ACTIVE // LISTENING TO MIC...";
-          isSpeaking = true;
+          const state = payload.state || "listening";
+          if (state === "listening") {
+            setHudState("LISTENING");
+            addStreamCard("VOICE INPUT", "Listening to microphone...", "user");
+          } else if (state === "processing") {
+            setHudState("THINKING");
+          }
         } else if (eventType === "TOOL_ACTION") {
-          addFeedItem("TOOL INVOCATION", `${payload.tool} with parameters ${JSON.stringify(payload.params)}`, "tool");
+          setHudState("THINKING");
+          const paramsStr = JSON.stringify(payload.params || {});
+          addStreamCard("TOOL INVOCATION", `[${payload.tool}] with parameters:\n${paramsStr}`, "tool");
+        } else if (eventType === "TOOL_OBSERVATION") {
+          setHudState("THINKING");
+          let content = typeof payload.result === "object" ? JSON.stringify(payload.result, null, 2) : String(payload.result);
+          let plotPath = null;
+          if (payload.result && typeof payload.result === "object") {
+            plotPath = payload.result.plot_path || payload.result.image_path || null;
+          }
+          addStreamCard(`OBSERVATION // ${payload.tool}`, content, "tool", plotPath);
         } else if (eventType === "RESPONSE_GENERATED") {
-          addFeedItem("FRIDAY", payload.response, "friday");
-          document.getElementById("statusSub").innerText = "CONNECTED // REALTIME TELEMETRY";
-          isSpeaking = true;
-          setTimeout(() => { isSpeaking = false; }, 3500);
+          setHudState("SPEAKING");
+          addStreamCard("FRIDAY", payload.response, "friday");
+          setTimeout(() => {
+            if (currentState === "SPEAKING") setHudState("IDLE");
+          }, 3200);
+          fetchStatus();
         }
+      } else if (data.type === "HUD_STATE") {
+        setHudState(data.state || "IDLE");
       } else if (data.type === "SECURITY_PROMPT") {
-        currentPendingAction = data.id;
+        playSciFiChime("alert");
+        pendingSecurityAction = data.id;
         document.getElementById("securityDesc").innerText = `${data.tool_name}: ${data.description}`;
         document.getElementById("securityModal").style.display = "flex";
       }
     }
 
+    function addStreamCard(title, content, type = "friday", plotPath = null) {
+      const stream = document.getElementById("activityStream");
+      const card = document.createElement("div");
+      card.className = `stream-card ${type}`;
+
+      const metaClass = type === "friday" ? "friday-meta" : (type === "tool" ? "tool-meta" : "");
+      let formattedText = escapeHtml(content).replace(/\n/g, "<br>");
+
+      // Check if text itself contains an attachment link like vault/attachments/plot.png or /attachments/plot.png
+      const match = content.match(/(\/attachments\/[^\s\)]+\.png|vault\/attachments\/([^\s\)]+\.png))/i);
+      let imgSrc = null;
+      if (plotPath) {
+        imgSrc = plotPath.replace(/^vault[\/\\]/, "/").replace(/\\/g, "/");
+        if (!imgSrc.startsWith("/")) imgSrc = "/" + imgSrc;
+      } else if (match) {
+        imgSrc = match[1].replace(/^vault[\/\\]/, "/").replace(/\\/g, "/");
+        if (!imgSrc.startsWith("/")) imgSrc = "/" + imgSrc;
+      }
+
+      let imgHtml = "";
+      if (imgSrc) {
+        imgHtml = `<br><img src="${imgSrc}" class="telemetry-img" alt="Bode Plot" onclick="window.open('${imgSrc}', '_blank')" />`;
+      }
+
+      card.innerHTML = `
+        <div class="card-meta ${metaClass}">${title}</div>
+        <div>${formattedText}</div>
+        ${imgHtml}
+      `;
+
+      stream.appendChild(card);
+      stream.scrollTop = stream.scrollHeight;
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement("div");
+      div.innerText = text;
+      return div.innerHTML;
+    }
+
+    function clearFeed() {
+      const stream = document.getElementById("activityStream");
+      stream.innerHTML = "";
+      playSciFiChime("click");
+    }
+
+    /* =====================================================================
+       USER ACTIONS: PROMPTS & VOICE
+       ===================================================================== */
+    function sendPrompt() {
+      const input = document.getElementById("promptBox");
+      const text = input.value.trim();
+      if (!text) return;
+
+      playSciFiChime("ack");
+      addStreamCard("USER", text, "user");
+      input.value = "";
+      setHudState("THINKING");
+
+      fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: text })
+      })
+      .then(res => res.json())
+      .then(data => {
+        setHudState("SPEAKING");
+        addStreamCard("FRIDAY", data.response, "friday");
+        setTimeout(() => {
+          if (currentState === "SPEAKING") setHudState("IDLE");
+        }, 3000);
+        fetchStatus();
+      })
+      .catch(err => {
+        addStreamCard("SYSTEM ERROR", err.toString(), "tool");
+        setHudState("IDLE");
+      });
+    }
+
+    function runQuickAction(prompt) {
+      document.getElementById("promptBox").value = prompt;
+      sendPrompt();
+    }
+
+    function handleKey(e) {
+      if (e.key === "Enter") {
+        sendPrompt();
+      } else if (e.key === "Escape") {
+        closeHUD();
+      }
+    }
+
     async function toggleVoice() {
       const btn = document.getElementById("voiceBtn");
+      const btnText = document.getElementById("voiceBtnText");
+
       if (!isRecordingAudio) {
         try {
           const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -455,29 +1157,26 @@
           };
           mediaRecorder.start();
           isRecordingAudio = true;
-          btn.innerText = "⏹ STOP";
-          btn.style.background = "rgba(255, 51, 102, 0.5)";
-          btn.style.borderColor = "#ff3366";
-          document.getElementById("statusSub").innerText = "VOICE ACTIVE // LISTENING TO MIC...";
-          isSpeaking = true;
+          btn.classList.add("recording");
+          btnText.innerText = "STOP";
+          setHudState("LISTENING");
         } catch (err) {
           console.error("Microphone access error:", err);
-          addFeedItem("MICROPHONE NOTICE", "Push-to-Talk is active! Press and release Ctrl+Space or Win+Space from your keyboard.", "tool");
+          addStreamCard("MICROPHONE NOTICE", "Push-to-Talk is active! Press and release Ctrl+Space from your keyboard.", "tool");
         }
       } else {
         if (mediaRecorder && mediaRecorder.state !== "inactive") {
           mediaRecorder.stop();
         }
         isRecordingAudio = false;
-        btn.innerText = "🎙️ VOICE";
-        btn.style.background = "rgba(0, 240, 255, 0.15)";
-        btn.style.borderColor = "var(--cyan-glow)";
-        document.getElementById("statusSub").innerText = "THINKING // CLOUD BRAIN ACTIVE";
+        btn.classList.remove("recording");
+        btnText.innerText = "VOICE";
+        setHudState("THINKING");
       }
     }
 
     async function sendAudioBlob(blob) {
-      addFeedItem("VOICE INPUT", "Spoken audio captured — sending to Cloud Brain...", "user");
+      addStreamCard("VOICE INPUT", "Audio captured — streaming to Cloud Brain...", "user");
       try {
         const res = await fetch("/api/voice", {
           method: "POST",
@@ -485,80 +1184,42 @@
           body: blob
         });
         const data = await res.json();
-        addFeedItem("FRIDAY", data.response, "friday");
-        document.getElementById("statusSub").innerText = "CONNECTED // STANDBY";
+        setHudState("SPEAKING");
+        addStreamCard("FRIDAY", data.response, "friday");
+        setTimeout(() => {
+          if (currentState === "SPEAKING") setHudState("IDLE");
+        }, 3200);
         fetchStatus();
       } catch (err) {
-        addFeedItem("VOICE ERROR", err.toString(), "tool");
-        document.getElementById("statusSub").innerText = "ERROR OCCURRED";
-      }
-    }
-
-    function addFeedItem(title, content, type = "friday") {
-      const feed = document.getElementById("activityFeed");
-      const item = document.createElement("div");
-      item.className = `feed-item ${type}`;
-      item.innerHTML = `<div class="feed-header">${title}</div><div>${content.replace(/\n/g, '<br>')}</div>`;
-      feed.appendChild(item);
-      feed.scrollTop = feed.scrollHeight;
-    }
-
-    function sendPrompt() {
-      const input = document.getElementById("promptInput");
-      const text = input.value.trim();
-      if (!text) return;
-
-      addFeedItem("USER", text, "user");
-      input.value = "";
-      document.getElementById("statusSub").innerText = "THINKING // CLOUD BRAIN ACTIVE";
-
-      fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text })
-      })
-      .then(res => res.json())
-      .then(data => {
-        addFeedItem("FRIDAY", data.response, "friday");
-        document.getElementById("statusSub").innerText = "CONNECTED // STANDBY";
-        fetchStatus();
-      })
-      .catch(err => {
-        addFeedItem("SYSTEM ERROR", err.toString(), "tool");
-        document.getElementById("statusSub").innerText = "ERROR OCCURRED";
-      });
-    }
-
-    function handleKey(e) {
-      if (e.key === "Enter") {
-        sendPrompt();
-      } else if (e.key === "Escape") {
-        closeHUD();
+        addStreamCard("VOICE ERROR", err.toString(), "tool");
+        setHudState("IDLE");
       }
     }
 
     function resolveSecurity(approved) {
       document.getElementById("securityModal").style.display = "none";
-      if (ws && currentPendingAction) {
+      if (ws && pendingSecurityAction) {
         ws.send(JSON.stringify({
           action: "SECURITY_RESPONSE",
-          id: currentPendingAction,
+          id: pendingSecurityAction,
           approved: approved
         }));
       }
+      playSciFiChime(approved ? "ack" : "alert");
     }
 
     function fetchStatus() {
       fetch("/api/status")
         .then(res => res.json())
         .then(data => {
-          document.getElementById("brainModel").innerText = data.brain_model;
-          document.getElementById("vaultCount").innerText = `${data.obsidian_notes_count} Notes`;
+          document.getElementById("telemetryBrain").innerText = data.brain_model;
+          document.getElementById("telemetryVault").innerText = `${data.obsidian_notes_count} Notes`;
         })
         .catch(console.error);
     }
 
     function closeHUD() {
+      playSciFiChime("click");
       if (window.pywebview) {
         window.pywebview.api.hide();
       } else {
@@ -566,43 +1227,10 @@
       }
     }
 
-    // Audio Waveform Visualizer on Canvas
-    const canvas = document.getElementById("waveformCanvas");
-    const ctx = canvas.getContext("2d");
-    let phase = 0;
-
-    function renderWaveform() {
-      canvas.width = canvas.offsetWidth;
-      canvas.height = canvas.offsetHeight;
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      const width = canvas.width;
-      const height = canvas.height;
-      const centerY = height / 2;
-
-      ctx.beginPath();
-      ctx.strokeStyle = isSpeaking ? "rgba(0, 240, 255, 0.85)" : "rgba(0, 240, 255, 0.25)";
-      ctx.lineWidth = isSpeaking ? 2.5 : 1.2;
-
-      const numPoints = 80;
-      const step = width / numPoints;
-
-      for (let i = 0; i <= numPoints; i++) {
-        const x = i * step;
-        const amp = isSpeaking ? Math.sin((i / 5) + phase) * 10 : Math.sin((i / 8) + phase) * 3;
-        const y = centerY + amp;
-        if (i === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-      }
-      ctx.stroke();
-
-      phase += isSpeaking ? 0.25 : 0.05;
-      requestAnimationFrame(renderWaveform);
-    }
-
     window.onload = () => {
+      resizeCanvas();
+      renderArcReactor();
       connectWS();
-      renderWaveform();
     };
   </script>
 </body>

@@ -184,6 +184,78 @@ class GeminiProvider:
             "and add it to your .env file (you can supply multiple comma-separated keys: GEMINI_API_KEY=key1,key2)."
         )
 
+    def generate_stream(self, prompt: str) -> Generator[str, None, None]:
+        """Generate streaming token chunks from Gemini with multi-model failover."""
+        if not self.is_configured():
+            raise ValueError(
+                "Gemini API key is not configured. Set GEMINI_API_KEY in your .env file."
+            )
+
+        total_keys = max(1, len(self.api_keys))
+        for _ in range(total_keys):
+            models_to_try = [self.model_name] + [m for m in FALLBACK_MODELS if m != self.model_name]
+            for candidate in models_to_try:
+                try:
+                    if candidate != self.model_name or self._model is None:
+                        self.model_name = candidate
+                        self._configure()
+                    assert self._model is not None
+                    response = self._model.generate_content(prompt, stream=True, request_options={"retry": None})
+                    for chunk in response:
+                        try:
+                            if chunk.text:
+                                yield chunk.text
+                        except Exception:
+                            pass
+                    return
+                except Exception as exc:
+                    err_str = str(exc).lower()
+                    if any(x in err_str for x in ("429", "quota", "not found", "503", "unavailable")):
+                        continue
+                    yield f"I ran into an issue connecting to my cloud brain: {exc}"
+                    return
+
+            if not self._rotate_to_next_key():
+                break
+
+        yield "Boss, our cloud brain reached the daily quota across available free-tier Gemini models."
+
+    def chat_stream(self, user_message: str) -> Generator[str, None, None]:
+        """Stream chunks from active stateful chat session."""
+        if not self.is_configured():
+            raise ValueError(
+                "Gemini API key is not configured. Set GEMINI_API_KEY in your .env file."
+            )
+
+        total_keys = max(1, len(self.api_keys))
+        for _ in range(total_keys):
+            models_to_try = [self.model_name] + [m for m in FALLBACK_MODELS if m != self.model_name]
+            for candidate in models_to_try:
+                try:
+                    if candidate != self.model_name or self._chat is None:
+                        self.model_name = candidate
+                        self._configure()
+                    assert self._chat is not None
+                    response = self._chat.send_message(user_message, stream=True, request_options={"retry": None})
+                    for chunk in response:
+                        try:
+                            if chunk.text:
+                                yield chunk.text
+                        except Exception:
+                            pass
+                    return
+                except Exception as exc:
+                    err_str = str(exc).lower()
+                    if any(x in err_str for x in ("429", "quota", "not found", "503", "unavailable")):
+                        continue
+                    yield f"I ran into an issue connecting to my cloud brain: {exc}"
+                    return
+
+            if not self._rotate_to_next_key():
+                break
+
+        yield "Boss, our cloud brain reached the daily quota across available free-tier Gemini models."
+
     def generate_with_image(self, prompt: str, image: Any) -> str:
         """Generate response given a text prompt and an image (path, bytes, or PIL Image).
 
@@ -265,6 +337,45 @@ class GeminiProvider:
             "To resolve this instantly, generate a fresh free API key at https://aistudio.google.com/ "
             "and add it to your .env file (you can supply multiple comma-separated keys: GEMINI_API_KEY=key1,key2)."
         )
+
+    def generate_with_audio_stream(self, prompt: str, audio_bytes: bytes) -> Generator[str, None, None]:
+        """Stream response chunks from multimodal audio WAV input."""
+        if not self.is_configured():
+            raise ValueError(
+                "Gemini API key is not configured. Set GEMINI_API_KEY in your .env file."
+            )
+
+        from google.generativeai.types import content_types
+        audio_blob = content_types.to_blob({"mime_type": "audio/wav", "data": audio_bytes})
+
+        total_keys = max(1, len(self.api_keys))
+        for _ in range(total_keys):
+            models_to_try = [self.model_name] + [m for m in FALLBACK_MODELS if m != self.model_name]
+            for candidate in models_to_try:
+                try:
+                    if candidate != self.model_name or self._model is None:
+                        self.model_name = candidate
+                        self._configure()
+                    assert self._model is not None
+                    response = self._model.generate_content([audio_blob, prompt], stream=True, request_options={"retry": None})
+                    for chunk in response:
+                        try:
+                            if chunk.text:
+                                yield chunk.text
+                        except Exception:
+                            pass
+                    return
+                except Exception as exc:
+                    err_str = str(exc).lower()
+                    if any(x in err_str for x in ("429", "quota", "not found", "503", "unavailable")):
+                        continue
+                    yield f"I ran into an issue processing audio with my cloud brain: {exc}"
+                    return
+
+            if not self._rotate_to_next_key():
+                break
+
+        yield "Boss, our cloud brain reached the daily quota across available free-tier Gemini models."
 
     def reset_chat(self) -> None:
         """Reset the active chat session history."""

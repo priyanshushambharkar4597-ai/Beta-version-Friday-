@@ -7,8 +7,9 @@ import os
 from pathlib import Path
 import re
 import time
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, Generator, Iterable, List, Optional, Tuple
 
+from friday.voice.tts import clean_for_speech
 from friday.llm.gemini_provider import GeminiProvider
 from friday.memory.backup import (
     BackupVaultTool,
@@ -48,6 +49,25 @@ from friday.tools.dynamic_manager import CreateSkillTool, DynamicSkillManager
 
 
 ACTION_PATTERN = re.compile(r"```(?:action|json:action)\s*(\{.*?\})\s*```", re.DOTALL)
+
+
+def stream_sentence_splitter(token_stream: Iterable[str]) -> Generator[str, None, None]:
+    """Split incoming token stream into complete sentences as soon as punctuation boundaries appear."""
+    buffer = ""
+    sentence_end = re.compile(r"([.?!]+(?:\s+|$))|\n+")
+    for chunk in token_stream:
+        buffer += chunk
+        while True:
+            match = sentence_end.search(buffer)
+            if not match:
+                break
+            end_pos = match.end()
+            sentence = buffer[:end_pos].strip()
+            buffer = buffer[end_pos:]
+            if sentence:
+                yield sentence
+    if buffer.strip():
+        yield buffer.strip()
 
 
 class FridayAgent:
@@ -166,7 +186,12 @@ class FridayAgent:
             "```\n"
             "You will receive the local execution output in a subsequent message as '[Observation for <tool_name>]: ...'.\n"
             "You can execute multiple steps in sequence (inspect -> patch -> test -> reflect).\n"
-            "Always explain your engineering rationale clearly."
+            "Always explain your engineering rationale clearly.\n\n"
+            "STRICT SPOKEN VOICE VS. VISUAL HUD TELEMETRY RULES:\n"
+            "- Vocal Output: Respond verbally in maximum 1-2 sharp, conversational, natural sentences.\n"
+            "- NEVER speak markdown formatting, bullet lists, asterisks, raw code, or LaTeX formulas aloud.\n"
+            "- Visual Payload: Detailed technical breakdowns, logs, equations, and images are broadcast to the HUD interface, NOT read aloud.\n"
+            "- When executing analytical or graphical tools (e.g. transfer functions, Bode plots), confirm in 1 sentence that the action is complete and mention that the plots and specs are on the HUD."
         )
 
         try:
@@ -384,12 +409,18 @@ class FridayAgent:
 
         return final_response
 
-    def handle_audio(self, audio_bytes: bytes, max_iterations: int = 5) -> str:
+    def handle_audio(
+        self,
+        audio_bytes: bytes,
+        max_iterations: int = 5,
+        on_sentence: Optional[Callable[[str], None]] = None,
+    ) -> str:
         """Process spoken user audio through Gemini multimodal speech-to-speech loop.
 
         Args:
             audio_bytes: 16kHz mono WAV audio bytes recorded from microphone.
             max_iterations: Maximum tool call iterations.
+            on_sentence: Optional callback invoked concurrently as each sentence completes.
 
         Returns:
             Friday's synthesized text response (concise, spoken format).
@@ -410,11 +441,45 @@ class FridayAgent:
             '  "parameters": { ... }\n'
             "}\n"
             "```\n"
-            "Otherwise, formulate a direct, natural, concise conversational spoken reply suited for Text-To-Speech output."
+            "Otherwise, formulate a direct, natural, concise conversational spoken reply (max 1-2 sentences) "
+            "strictly without markdown, bullet points, asterisks, or code, suitable for Text-To-Speech vocalization."
         )
 
         try:
-            model_reply = self.llm.generate_with_audio(instruction, audio_bytes)
+            if on_sentence is not None and hasattr(self.llm, "generate_with_audio_stream"):
+                chunks: List[str] = []
+                is_action = False
+                stream = self.llm.generate_with_audio_stream(instruction, audio_bytes)
+                early_buffer = ""
+                stream_iter = iter(stream)
+                for chunk in stream_iter:
+                    chunks.append(chunk)
+                    early_buffer += chunk
+                    if "```" in early_buffer:
+                        is_action = True
+                        break
+                    if len(early_buffer) > 20:
+                        break
+
+                if not is_action:
+                    def _remaining_chunks():
+                        yield early_buffer
+                        for c in stream_iter:
+                            chunks.append(c)
+                            yield c
+
+                    for sentence in stream_sentence_splitter(_remaining_chunks()):
+                        cleaned = clean_for_speech(sentence)
+                        if cleaned:
+                            on_sentence(cleaned)
+
+                    model_reply = "".join(chunks)
+                else:
+                    for c in stream_iter:
+                        chunks.append(c)
+                    model_reply = "".join(chunks)
+            else:
+                model_reply = self.llm.generate_with_audio(instruction, audio_bytes)
         except Exception as exc:
             return f"I ran into an issue processing your audio: {exc}"
 
@@ -433,7 +498,15 @@ class FridayAgent:
                     "remember",
                     {"title": title, "content": raw_memory, "category": "spoken_memory"},
                 )
-                return f"I've saved {title} to your Obsidian vault."
+                conf = f"I've saved {title} to your Obsidian vault."
+                if on_sentence:
+                    on_sentence(conf)
+                return conf
+
+            if on_sentence and not hasattr(self.llm, "generate_with_audio_stream"):
+                cleaned = clean_for_speech(model_reply)
+                if cleaned:
+                    on_sentence(cleaned)
             return model_reply
 
         # Execute actions if produced
@@ -459,11 +532,29 @@ class FridayAgent:
         followup_prompt = (
             f"Here are the local tool execution results:\n"
             f"{chr(10).join(observations)}\n\n"
-            f"Provide a natural, concise spoken confirmation aloud to the user."
+            f"Provide a natural, ultra-concise spoken confirmation aloud to the user (maximum 1-2 sharp sentences). "
+            f"Strictly NO markdown, bullet points, asterisks, or code. "
+            f"State clearly that the technical details and any generated plots/results are displayed on the HUD."
         )
+
         try:
-            final_reply = self.llm.chat(followup_prompt)
-            return final_reply
+            if on_sentence is not None and hasattr(self.llm, "chat_stream"):
+                final_parts: List[str] = []
+                stream = self.llm.chat_stream(followup_prompt)
+                for sentence in stream_sentence_splitter(stream):
+                    final_parts.append(sentence)
+                    cleaned = clean_for_speech(sentence)
+                    if cleaned:
+                        on_sentence(cleaned)
+                final_reply = " ".join(final_parts)
+                return final_reply if final_reply else model_reply
+            else:
+                final_reply = self.llm.chat(followup_prompt)
+                if on_sentence:
+                    cleaned = clean_for_speech(final_reply)
+                    if cleaned:
+                        on_sentence(cleaned)
+                return final_reply
         except Exception:
             return model_reply
 

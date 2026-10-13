@@ -101,6 +101,9 @@ class FridayTrayDaemon:
                     # User triggered hotkey again to finish speaking
                     logger.info("Finishing voice recording...")
                     audio_bytes = self.recorder.stop_recording()
+                    from friday.voice.earcon import play_audio_in, play_audio_out
+                    play_audio_in()
+
                     if len(audio_bytes) > 800:
                         def _process_speech():
                             try:
@@ -113,15 +116,38 @@ class FridayTrayDaemon:
                                     source="voice",
                                 )
                                 agent = get_agent()
-                                reply = agent.handle_audio(audio_bytes)
+
+                                if not self.tts_muted:
+                                    import queue
+                                    sent_q: queue.Queue[Optional[str]] = queue.Queue()
+
+                                    def _sent_stream():
+                                        while True:
+                                            s = sent_q.get()
+                                            if s is None:
+                                                break
+                                            yield s
+
+                                    def _stream_player():
+                                        self.tts.speak_stream(_sent_stream())
+
+                                    player_thread = threading.Thread(target=_stream_player, daemon=True)
+                                    player_thread.start()
+
+                                    def _on_sentence(sent: str):
+                                        sent_q.put(sent)
+
+                                    reply = agent.handle_audio(audio_bytes, on_sentence=_on_sentence)
+                                    sent_q.put(None)
+                                else:
+                                    reply = agent.handle_audio(audio_bytes)
+
                                 logger.info(f"Friday spoken reply: {reply}")
                                 bus.publish(
                                     EventType.RESPONSE_GENERATED,
                                     {"response": reply},
                                     source="agent",
                                 )
-                                if not self.tts_muted:
-                                    self.tts.speak(reply, async_playback=True)
                             except Exception as exc:
                                 logger.warning(f"Voice processing notice: {exc}")
 

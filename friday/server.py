@@ -21,11 +21,18 @@ from friday.llm.gemini_provider import GeminiProvider
 from friday.tools.base import PermissionGate, PermissionTier
 
 
+from fastapi.staticfiles import StaticFiles
+
 app = FastAPI(
     title="Friday AI Assistant API",
     description="Thin, observable FastAPI backend for Friday's Cloud-Brain, Local-Body assistant.",
     version="0.2.0",
 )
+
+# Mount static attachments directory for Bode plots and vision captures
+attachments_dir = Path("vault/attachments")
+attachments_dir.mkdir(parents=True, exist_ok=True)
+app.mount("/attachments", StaticFiles(directory=str(attachments_dir)), name="attachments")
 
 # Global instances
 _agent: Optional[FridayAgent] = None
@@ -203,6 +210,12 @@ def chat(request: ChatRequest) -> ChatResponse:
 async def voice_endpoint(request: Request) -> Dict[str, Any]:
     """Process speech-to-speech audio WAV bytes directly from HUD or microphone stream."""
     audio_bytes = await request.body()
+    try:
+        from friday.voice.earcon import play_audio_in
+        play_audio_in()
+    except Exception:
+        pass
+
     agent = get_agent()
     bus = get_event_bus()
 
