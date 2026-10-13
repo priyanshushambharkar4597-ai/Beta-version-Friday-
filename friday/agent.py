@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+from pathlib import Path
 import re
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
@@ -17,7 +18,8 @@ from friday.tools.builtin.coding_tools import (
     ReadFileTool,
     WriteFileTool,
 )
-from friday.tools.builtin.memory_tools import RecallTool, RememberTool
+from friday.tools.builtin.memory_tools import RecallTool, RememberTool, UpdateCoreMemoryTool
+from friday.tools.builtin.repl_tool import PythonReplTool
 from friday.tools.builtin.vision_tools import CaptureScreenTool
 from friday.tools.dynamic_manager import CreateSkillTool, DynamicSkillManager
 
@@ -54,6 +56,7 @@ class FridayAgent:
         # Register Memory tools
         self.register_tool(RememberTool(self.memory))
         self.register_tool(RecallTool(self.memory))
+        self.register_tool(UpdateCoreMemoryTool(memory_engine=self.memory))
 
         # Register Developer Workspace tools
         self.register_tool(ReadFileTool(self.workspace_dir))
@@ -61,6 +64,7 @@ class FridayAgent:
         self.register_tool(WriteFileTool(self.workspace_dir))
         self.register_tool(PatchFileTool(self.workspace_dir))
         self.register_tool(BashExecuteTool(self.workspace_dir))
+        self.register_tool(PythonReplTool())
 
         # Register Multimodal Vision tools
         self.register_tool(CaptureScreenTool(gemini_provider=self.llm))
@@ -74,12 +78,27 @@ class FridayAgent:
 
         self._update_system_instructions()
 
+    def _get_core_memory_text(self) -> str:
+        """Retrieve pinned core memory from Obsidian vault if present."""
+        try:
+            vault_dir = getattr(self.memory.vault, "vault_dir", None)
+            if vault_dir:
+                core_file = Path(vault_dir) / "_core_memory.md"
+                if core_file.exists():
+                    return core_file.read_text(encoding="utf-8").strip()
+        except Exception:
+            pass
+        return ""
+
     def _update_system_instructions(self) -> None:
-        """Ensure the LLM provider has complete awareness of Friday's local body tools."""
+        """Ensure the LLM provider has complete awareness of Friday's local body tools and core memory."""
         tool_docs = []
         for t in self.tools.values():
             tool_docs.append(f"- {t.name} [{t.tier.value}]: {t.description}")
         tools_str = "\n".join(tool_docs)
+
+        core_mem = self._get_core_memory_text()
+        core_mem_block = f"\n<core_memory>\n{core_mem}\n</core_memory>\n" if core_mem else ""
 
         system_prompt = (
             "You are Friday, an ultra-advanced, loyal, highly capable personal AI assistant.\n"
@@ -87,7 +106,8 @@ class FridayAgent:
             "- Your reasoning and intelligence reside in the cloud (Gemini).\n"
             "- Your physical senses and hands reside locally on the user's Windows machine.\n"
             "The user is a 2nd-year B.Tech Electronics & Telecommunication Engineering (ENTC) student.\n"
-            "Hardware constraints: Intel i5-12450H CPU, 16 GB RAM, RTX 3050 GPU (0% background ML GPU policy).\n\n"
+            "Hardware constraints: Intel i5-12450H CPU, 16 GB RAM, RTX 3050 GPU (0% background ML GPU policy).\n"
+            f"{core_mem_block}\n"
             "LOCAL TOOLS AVAILABLE IN YOUR BODY:\n"
             f"{tools_str}\n\n"
             "TOOL CALLING FORMAT:\n"
@@ -193,6 +213,8 @@ class FridayAgent:
         Returns:
             Friday's final synthesized response.
         """
+        self._update_system_instructions()
+
         # 1. Check for quick manual memory intent (e.g., "remember: Title - Content")
         remember_match = re.match(
             r"^remember(?:\s*that|\s*:)\s*(.+)$", user_input.strip(), re.IGNORECASE

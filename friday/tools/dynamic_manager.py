@@ -7,7 +7,9 @@ import importlib
 import importlib.util
 import inspect
 import os
+import subprocess
 import sys
+import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Type
 
@@ -102,7 +104,12 @@ class DynamicSkillManager:
         name: str,
         code: str,
     ) -> Dict[str, Any]:
-        """Author, save, and hot-reload a new custom Python skill on the fly.
+        """Author, verify in sandbox, save, and hot-reload a new custom Python skill on the fly.
+
+        Enforces a 3-stage validation pipeline:
+        1. AST Check: Validate Python syntax and BaseTool subclass inheritance.
+        2. Subprocess Dry-Run: Execute candidate in an isolated subprocess with a 5s timeout.
+        3. Safe Injection: Only write and register upon successful verification.
 
         Args:
             name: Alphanumeric identifier for the skill (e.g., 'resistor_color_code').
@@ -111,18 +118,90 @@ class DynamicSkillManager:
         Returns:
             Dictionary with creation and registration status.
         """
-        # 1. Static AST validation to catch syntax errors before writing to disk
+        # 1. AST Check: Validate Python syntax and verify BaseTool subclassing
         try:
-            ast.parse(code)
+            tree = ast.parse(code)
         except SyntaxError as syn_err:
             raise ValueError(f"Syntax error in dynamic tool code: {syn_err}")
 
-        # 2. Write code to dynamic directory
+        has_basetool = False
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ClassDef):
+                for base in node.bases:
+                    if (isinstance(base, ast.Name) and base.id == "BaseTool") or (
+                        isinstance(base, ast.Attribute) and base.attr == "BaseTool"
+                    ):
+                        has_basetool = True
+                        break
+            if has_basetool:
+                break
+
+        if not has_basetool:
+            raise ValueError(
+                "Dynamic skill verification failed: Code must define at least one class inheriting from 'BaseTool'."
+            )
+
+        # 2. Subprocess Dry-Run: Verify in an isolated temporary process
         clean_name = name.strip().lower().replace("-", "_")
+        temp_fd, temp_file_path = tempfile.mkstemp(prefix="friday_skill_", suffix=".py")
+        os.close(temp_fd)
+
+        try:
+            Path(temp_file_path).write_text(code, encoding="utf-8")
+            normalized_temp = temp_file_path.replace("\\", "/")
+            dry_run_code = (
+                "import importlib.util, inspect, sys\n"
+                "from friday.tools.base import BaseTool\n"
+                f"spec = importlib.util.spec_from_file_location('dry_run_mod', '{normalized_temp}')\n"
+                "if not spec or not spec.loader:\n"
+                "    sys.exit('Failed to build module spec')\n"
+                "mod = importlib.util.module_from_spec(spec)\n"
+                "spec.loader.exec_module(mod)\n"
+                "found = False\n"
+                "for attr in dir(mod):\n"
+                "    cls = getattr(mod, attr)\n"
+                "    if inspect.isclass(cls) and issubclass(cls, BaseTool) and cls is not BaseTool:\n"
+                "        tool = cls()\n"
+                "        if hasattr(tool, 'self_test') and callable(tool.self_test):\n"
+                "            tool.self_test()\n"
+                "        found = True\n"
+                "if not found:\n"
+                "    sys.exit('No BaseTool subclass could be instantiated in dynamic module')\n"
+            )
+
+            env = os.environ.copy()
+            workspace_root = str(Path(__file__).resolve().parents[2])
+            env["PYTHONPATH"] = f"{workspace_root}{os.pathsep}{env.get('PYTHONPATH', '')}"
+
+            proc = subprocess.run(
+                [sys.executable, "-c", dry_run_code],
+                capture_output=True,
+                text=True,
+                timeout=5,
+                env=env,
+            )
+
+            if proc.returncode != 0:
+                err_detail = proc.stderr.strip() or proc.stdout.strip()
+                raise ValueError(
+                    f"Dynamic skill dry-run verification failed (Exit code {proc.returncode}):\n{err_detail}"
+                )
+
+        except subprocess.TimeoutExpired:
+            raise ValueError(
+                "Dynamic skill dry-run verification timed out after 5 seconds."
+            )
+        finally:
+            if os.path.exists(temp_file_path):
+                try:
+                    os.remove(temp_file_path)
+                except Exception:
+                    pass
+
+        # 3. Safe Injection: Write code to dynamic directory and hot-reload
         target_file = self.dynamic_dir / f"{clean_name}.py"
         target_file.write_text(code, encoding="utf-8")
 
-        # 3. Hot-reload module into running process
         tools = self.load_module(clean_name)
         if not tools:
             raise ValueError(

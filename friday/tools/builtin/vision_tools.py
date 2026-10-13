@@ -1,9 +1,12 @@
-"""Vision Tools - Multimodal Screen Capture for Friday."""
+"""Vision Tools - Multimodal Screen Capture with Active Window Grounding for Friday."""
 
 from __future__ import annotations
 
+import ctypes
 import io
 import os
+import sys
+from ctypes import wintypes
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -13,13 +16,44 @@ from PIL import ImageGrab
 from friday.tools.base import BaseTool, PermissionTier
 
 
+def get_active_window_context() -> Dict[str, Any]:
+    """Retrieve the title and geometry bounds of the active foreground window on Windows."""
+    if sys.platform != "win32":
+        return {"title": "Unknown", "rect": None}
+
+    try:
+        user32 = ctypes.windll.user32
+        hwnd = user32.GetForegroundWindow()
+        if not hwnd:
+            return {"title": "Desktop / No Foreground Window", "rect": None}
+
+        length = user32.GetWindowTextLengthW(hwnd)
+        buf = ctypes.create_unicode_buffer(length + 1)
+        user32.GetWindowTextW(hwnd, buf, length + 1)
+        title = buf.value.strip() or "Untitled Window"
+
+        rect = wintypes.RECT()
+        user32.GetWindowRect(hwnd, ctypes.byref(rect))
+        rect_dict = {
+            "left": rect.left,
+            "top": rect.top,
+            "right": rect.right,
+            "bottom": rect.bottom,
+            "width": max(0, rect.right - rect.left),
+            "height": max(0, rect.bottom - rect.top),
+        }
+        return {"title": title, "rect": rect_dict}
+    except Exception:
+        return {"title": "Unknown", "rect": None}
+
+
 class CaptureScreenTool(BaseTool):
-    """Tool to capture screenshot and optionally route to Gemini Vision endpoint."""
+    """Tool to capture screenshot with active window context and optional Gemini Vision analysis."""
 
     name = "capture_screen"
     description = (
-        "Capture the active display as an image. Saves the screenshot locally and "
-        "can analyze its visual contents using Gemini Vision."
+        "Capture the active display as an image with foreground window context metadata. "
+        "Saves the screenshot locally and can analyze its visual contents using Gemini Vision."
     )
     tier = PermissionTier.READ
 
@@ -58,7 +92,7 @@ class CaptureScreenTool(BaseTool):
             save_path: Optional custom destination file path.
 
         Returns:
-            Dictionary containing screenshot file path, dimensions, and optional analysis.
+            Dictionary containing screenshot file path, dimensions, active window info, and analysis.
         """
         # Grab screen using CPU PIL ImageGrab with headless/background fallback
         try:
@@ -78,11 +112,20 @@ class CaptureScreenTool(BaseTool):
 
         screenshot.save(out_file, format="PNG")
 
+        # Capture active window grounding metadata
+        active_window = get_active_window_context()
+
         analysis = None
         if prompt and self.gemini_provider and self.gemini_provider.is_configured():
+            window_title = active_window.get("title", "")
+            enriched_prompt = (
+                f"[Workspace Context: Active Window '{window_title}']\n{prompt}"
+                if window_title and window_title != "Unknown"
+                else prompt
+            )
             try:
                 analysis = self.gemini_provider.generate_with_image(
-                    prompt=prompt,
+                    prompt=enriched_prompt,
                     image=screenshot,
                 )
             except Exception as exc:
@@ -93,5 +136,6 @@ class CaptureScreenTool(BaseTool):
             "file_path": str(out_file),
             "width": width,
             "height": height,
+            "active_window": active_window,
             "analysis": analysis,
         }

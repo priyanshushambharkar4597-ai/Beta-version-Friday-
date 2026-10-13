@@ -19,6 +19,8 @@ def test_capture_screen_tool(tmp_path: Path):
     assert res["width"] > 0
     assert res["height"] > 0
     assert res["file_path"].endswith(".png")
+    assert "active_window" in res
+    assert "title" in res["active_window"]
 
 
 def test_gemini_provider_generate_with_image():
